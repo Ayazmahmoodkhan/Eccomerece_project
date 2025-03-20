@@ -2,12 +2,12 @@ from fastapi import FastAPI, HTTPException, status, Depends, BackgroundTasks
 from fastapi_mail import FastMail, MessageSchema
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
-from database import get_db, Base , engine
-from models import User
-from schemas import UserCreate, UserLogin,ResetPasswordRequest
-from utils import hash_password, verify_password , pwd_context, create_reset_token, verify_reset_token
-from auth import create_access_token
-from send_email import send_email_background
+from app.database import get_db, Base , engine
+from app.models import User
+from app.schemas import UserCreate, UserLogin,ResetPasswordRequest
+from app.utils import hash_password, verify_password , pwd_context, create_reset_token, verify_reset_token
+from app.auth import create_access_token
+from app.send_email import send_email_background
 import os
 from fastapi.responses import RedirectResponse
 from app.routers import profile_address
@@ -42,19 +42,46 @@ def register(user:UserCreate,background_tasks:BackgroundTasks,db:Session=Depends
             {"title":"Welcome!","name":new_user.username}
         )
     return {"message":"User registered successfully"}
+# @app.post("/login/")
+# def login(user: UserLogin, db: Session = Depends(get_db)):
+#     db_user = db.query(User).filter(
+#         (User.username == user.login) | (User.email == user.login)
+#     ).first()
+#     if not db_user or not verify_password(user.password, db_user.hashed_password):
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+#         )
+#     if not db_user.is_active:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN, detail="Your account is inactive"
+#         )
+#     # Include user_id in token
+#     access_token = create_access_token(
+#         data={"user_id": db_user.id, "sub": db_user.username, "role": db_user.role.value}
+#     )
+#     return {"access_token": access_token, "token_type": "bearer"}
 @app.post("/login/")
-def login(user:UserLogin, db:Session=Depends(get_db)):
-    db_user = db.query(User).filter((User.username == user.login) | (User.email == user.login)).first()
+def login(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(
+        (User.username == user.login) | (User.email == user.login)
+    ).first()
     if not db_user or not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,details="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+        )
     if not db_user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, details="your account is inactive")
-    access_token = create_access_token(data={"sub": db_user.username, "role": db_user.role.value})
-    return {"access_token":access_token, "token_type":"bearer"}
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Your account is inactive"
+        )
+    # Updated function call (only user_id is passed)
+    access_token = create_access_token(db_user.id)
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
 #register & login end
 #forgot password reset start
 FRONTEND_BASE_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5500")
-from send_email import conf
+from app.send_email import conf
 @app.post("/forgot-password/")
 async def forgot_password(email: EmailStr, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """User ko password reset email send karega, token save nahi hoga"""

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from models import UserProfile, Address
-from schemas import ProfileCreate, ProfileUpdate, AddressCreate, AddressUpdate
-from database import get_db
-from auth import get_current_user
+from app.models import UserProfile, Address
+from app.schemas import  AddressCreate, AddressUpdate, UserProfileCreate, UserProfileUpdate
+from app.database import get_db
+from app.auth import get_current_user
 
 router = APIRouter()
 
@@ -17,7 +17,7 @@ def get_my_profile(db: Session = Depends(get_db), current_user=Depends(get_curre
 
 # Create Profile
 @router.post("/me/profile", status_code=status.HTTP_201_CREATED)
-def create_profile(profile_data: ProfileCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def create_profile(profile_data: UserProfileUpdate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     existing_profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
     if existing_profile:
         raise HTTPException(status_code=400, detail="Profile already exists.")
@@ -30,7 +30,7 @@ def create_profile(profile_data: ProfileCreate, db: Session = Depends(get_db), c
 
 # Update Profile
 @router.put("/me/profile", status_code=status.HTTP_200_OK)
-def update_profile(profile_data: ProfileUpdate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def update_profile(profile_data: UserProfileUpdate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found.")
@@ -43,7 +43,7 @@ def update_profile(profile_data: ProfileUpdate, db: Session = Depends(get_db), c
     return profile
 
 # Get Address
-@router.get("/me/address")
+@router.get("/address")
 def get_my_address(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     address = db.query(Address).filter(Address.user_id == current_user.id).all()
     if not address:

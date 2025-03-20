@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean ,Enum, Date, ForeignKey
-from database import Base
+from app.database import Base
 import enum
 from sqlalchemy.orm import relationship
 class UserRole(str,enum.Enum):
@@ -22,7 +22,7 @@ class User(Base):
 
 class UserProfile(Base):
     __tablename__="userprofile"
-    id=Column(Integer, Primary_key=True, index=True, unique=True)
+    id=Column(Integer, primary_key=True, index=True, unique=True)
     user_id=Column(Integer, ForeignKey("users.id"), unique=True)
     first_name=Column(String, nullable=False)
     last_name=Column(String, nullable=True)
