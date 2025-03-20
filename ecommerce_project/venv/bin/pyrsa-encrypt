@@ -1,4 +1,4 @@
-#!/media/waseem-baloch/14DEF89FDEF879F6/ecommerce_project/venv/bin/python3
+#!/home/waseem-baloch/Eccomerece_project/ecommerce_project/venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

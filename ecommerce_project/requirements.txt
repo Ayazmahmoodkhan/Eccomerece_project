@@ -1,0 +1,10 @@
+fastapi==0.110.0
+uvicorn==0.29.0
+pydantic==2.6.4
+sqlalchemy==2.0.29
+passlib==1.7.4
+python-dotenv==1.0.1
+bcrypt==4.1.2
+email-validator==2.1.1
+requests==2.31.0
+fastapi-mail==1.4.1

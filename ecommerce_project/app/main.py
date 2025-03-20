@@ -10,8 +10,11 @@ from auth import create_access_token
 from send_email import send_email_background
 import os
 from fastapi.responses import RedirectResponse
+from app.routers import profile_address
 
 app=FastAPI()
+app.include_router(profile_address.router, prefix="/me", tags=["Profile & Address"])
+
 Base.metadata.create_all(bind=engine)
 #register & login start
 @app.post("/register/")
