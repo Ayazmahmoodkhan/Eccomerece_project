@@ -26,7 +26,7 @@ class Addressbase(BaseModel):
     street:str
     city:str
     state:str
-    postel_code:str
+    postal_code:str
 class AddressCreate(Addressbase):
     pass
 class AddressUpdate(Addressbase):
@@ -41,7 +41,7 @@ class AddressResponse(Addressbase):
 class UserProfileBase(BaseModel):
     first_name: str
     last_name: str | None = None
-    date_of_birth: date
+    date_birth: date
     phone: str
     age: int
 class UserProfileCreate(UserProfileBase):

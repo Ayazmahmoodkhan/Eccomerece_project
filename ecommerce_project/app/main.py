@@ -42,24 +42,7 @@ def register(user:UserCreate,background_tasks:BackgroundTasks,db:Session=Depends
             {"title":"Welcome!","name":new_user.username}
         )
     return {"message":"User registered successfully"}
-# @app.post("/login/")
-# def login(user: UserLogin, db: Session = Depends(get_db)):
-#     db_user = db.query(User).filter(
-#         (User.username == user.login) | (User.email == user.login)
-#     ).first()
-#     if not db_user or not verify_password(user.password, db_user.hashed_password):
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
-#         )
-#     if not db_user.is_active:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN, detail="Your account is inactive"
-#         )
-#     # Include user_id in token
-#     access_token = create_access_token(
-#         data={"user_id": db_user.id, "sub": db_user.username, "role": db_user.role.value}
-#     )
-#     return {"access_token": access_token, "token_type": "bearer"}
+
 @app.post("/login/")
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(
