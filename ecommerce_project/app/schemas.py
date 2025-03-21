@@ -1,7 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field
-from datetime import date
+from pydantic import BaseModel, EmailStr, Field,HttpUrl
+from datetime import date,datetime
 from enum import Enum
-
+from typing import Optional
 class UserRoleEnum(str,Enum):
     admin="admin"
     user="user"
@@ -57,3 +57,97 @@ class UserProfileResponse(UserProfileBase):
     class Config:
         from_attributes=True
 #end
+
+
+
+class OrderStatus(str, Enum):
+    pending = "pending"
+    shipped = "shipped"
+    delivered = "delivered"
+    cancelled = "cancelled"
+
+# Product Schema
+class ProductBase(BaseModel):
+    product_name: str
+    image_url: Optional[HttpUrl] = None
+    price: float
+    discount: float
+    stock: bool
+    brand: str
+    category_id: int
+    admin_id: int
+
+class ProductCreate(ProductBase):
+    pass
+
+class ProductUpdate(ProductBase):
+    pass
+
+class ProductResponse(ProductBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+# Cart Schema
+class CartBase(BaseModel):
+    user_id: int
+    product_id: int
+    grand_total: float
+    item_total: int
+
+class CartCreate(CartBase):
+    pass
+
+class CartUpdate(CartBase):
+    pass
+
+class CartResponse(CartBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+# Order Schema
+class OrderBase(BaseModel):
+    order_date: datetime
+    order_amount: float
+    shipping_date: Optional[datetime] = None
+    order_status: OrderStatus
+    cart_id: int
+    user_id: int
+
+class OrderCreate(OrderBase):
+    pass
+
+class OrderUpdate(OrderBase):
+    pass
+
+class OrderResponse(OrderBase):
+    id: int
+    class Config:
+        from_attributes = True
+        
+class OrderItemSchema(BaseModel):
+    id: Optional[int] = None
+    order_id: int
+    product_id: int
+    mrp: float
+    quantity: int
+
+    class Config:
+        from_attributes = True 
+
+class ReviewBase(BaseModel):
+    description: str
+    rating: str  # ENUM (1-5) as string
+
+class ReviewCreate(ReviewBase):
+    product_id: int
+    customer_id: int
+
+class ReviewResponse(ReviewBase):
+    review_id: int
+    product_id: int
+    customer_id: int
+
+    class Config:
+        orm_mode = True
