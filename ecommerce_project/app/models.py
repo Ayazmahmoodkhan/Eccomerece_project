@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Enum, Date, ForeignKey, Float, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Enum, Date, ForeignKey, Float, DateTime, Text
 from app.database import Base
 import enum
 from sqlalchemy.orm import relationship
@@ -86,21 +86,30 @@ class Product(Base):
     id = Column(Integer, primary_key=True, index=True)
     sku = Column(String, nullable=False, unique=True)  # Added SKU for unique product identification
     product_name = Column(String, nullable=False)
-    image_url = Column(String)
+    description=Column(Text)
+    color = Column(String, nullable=True)
     price = Column(Float, nullable=False)
     discount = Column(Float, nullable=False)
-    stock = Column(Integer, nullable=False)  # Changed from Boolean to Integer (for better stock tracking)
+    stock = Column(Integer, nullable=False)  
     brand = Column(String, nullable=False)
+    shipping_time = Column(String, nullable=True) 
     category_id = Column(Integer, ForeignKey("categories.id"))  
-    admin_id = Column(Integer, ForeignKey("users.id"))
-
+    admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     # Relationships
     carts = relationship("Cart", back_populates="product")
     category = relationship("Category", back_populates="products")
     admin = relationship("User", back_populates="products")
     reviews = relationship("Review", back_populates="product")
     order_items = relationship("OrderItem", back_populates="product")
+    images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
+class ProductImage(Base):
+    __tablename__ = "product_images"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"))
+    image_url = Column(String, nullable=False)
 
+    product = relationship("Product", back_populates="images")
 # Cart Table
 class Cart(Base):
     __tablename__ = "carts"

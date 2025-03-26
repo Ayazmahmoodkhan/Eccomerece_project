@@ -86,12 +86,14 @@ class CategoryResponse(CategoryBase):
 # Product Schema
 class ProductBase(BaseModel):
     product_name: str
-    image_url: Optional[HttpUrl] = None
     price: float
     discount: float
-    stock: int  # Integer for better stock tracking
+    stock: int
     brand: str
     category_id: int
+    description: str
+    color: str
+    shipping_time: str
 
 class ProductCreate(ProductBase):
     pass

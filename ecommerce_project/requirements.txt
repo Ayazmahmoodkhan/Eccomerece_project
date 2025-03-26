@@ -10,3 +10,4 @@ requests==2.31.0
 fastapi-mail==1.4.1
 psycopg2-binary==2.9.10
 pyjwt==2.10.1
+python-multipart==0.0.20
