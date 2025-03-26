@@ -3,7 +3,7 @@ from fastapi_mail import FastMail, MessageSchema
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 from app.database import get_db, Base , engine
-from app.models import User,UserProfile, Address, Category, Product, Cart, Order, OrderItem,Review
+from app.models import User,UserProfile, Address, Category, Product, Cart, Order, OrderItem,Review,Payment
 from app.schemas import UserCreate, UserLogin,ResetPasswordRequest
 from app.utils import hash_password, verify_password , pwd_context, create_reset_token, verify_reset_token
 from app.auth import create_access_token
@@ -12,9 +12,12 @@ import os
 from fastapi.responses import RedirectResponse
 from app.routers import profile_address
 from app.routers.admin import router as admin_router
-
+from app.routers.categoryroute import router as category_router
+from app.routers.productroute import router as product_router
 app=FastAPI()
 app.include_router(admin_router)
+app.include_router(category_router)
+app.include_router(product_router)
 app.include_router(profile_address.router, prefix="/me", tags=["Profile & Address"])
 
 Base.metadata.create_all(bind=engine)

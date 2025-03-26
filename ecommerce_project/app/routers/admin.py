@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.schemas import  UserCreate
-
 from app.auth import get_current_user
 from app.utils import pwd_context
 from app.database import get_db
-from app.models import User, Product, Order
-from app.schemas import ProductCreate, ProductUpdate, OrderUpdate
+from app.models import User, Product, Order, Category
+from app.schemas import ProductCreate, ProductUpdate, OrderUpdate, CategoryResponse
 router=APIRouter()
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -53,7 +52,11 @@ def get_admin_profile(admin: User = Depends(admin_required), db: Session = Depen
         "total_sales": total_sales,
         "total_revenue": total_revenue
     }
-
+#category 
+@router.get("/categories", response_model=list[CategoryResponse])
+def get_categories(db: Session = Depends(get_db)):
+    categories = db.query(Category).all()
+    return categories
 #Product Management
 @router.post("/products")
 def add_product(product: ProductCreate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
@@ -86,7 +89,7 @@ def delete_product(product_id: int, admin: User = Depends(admin_required), db: S
     db.commit()
     return {"msg": "Product deleted successfully"}
 
-#3️⃣ Order Management
+#Order Management
 @router.get("/orders")
 def get_orders(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
     orders = db.query(Order).all()

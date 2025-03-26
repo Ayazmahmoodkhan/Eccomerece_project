@@ -66,16 +66,32 @@ class OrderStatus(str, Enum):
     delivered = "delivered"
     cancelled = "cancelled"
 
+# Category Base schema (Common fields)
+class CategoryBase(BaseModel):
+    category_name: str
+    description: Optional[str] = None
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryUpdate(BaseModel):
+    category_name: Optional[str] = None
+    description: Optional[str] = None
+
+class CategoryResponse(CategoryBase):
+    id: int
+
+    class Config:
+        from_attributes = True
 # Product Schema
 class ProductBase(BaseModel):
     product_name: str
     image_url: Optional[HttpUrl] = None
     price: float
     discount: float
-    stock: bool
+    stock: int  # Integer for better stock tracking
     brand: str
     category_id: int
-    admin_id: int
 
 class ProductCreate(ProductBase):
     pass
