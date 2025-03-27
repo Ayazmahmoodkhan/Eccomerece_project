@@ -3,6 +3,7 @@ from app.database import Base
 import enum
 from sqlalchemy.orm import relationship
 
+
 # Enums
 class UserRole(str, enum.Enum):
     admin = "admin"

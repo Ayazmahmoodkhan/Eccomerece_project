@@ -5,7 +5,7 @@ from app.auth import get_current_user
 from app.utils import pwd_context
 from app.database import get_db
 from app.models import User, Product, Order, Category
-from app.schemas import ProductCreate, ProductUpdate, OrderUpdate, CategoryResponse
+from app.schemas import ProductCreate, OrderUpdate, CategoryResponse
 router=APIRouter()
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -58,36 +58,6 @@ def get_categories(db: Session = Depends(get_db)):
     categories = db.query(Category).all()
     return categories
 #Product Management
-@router.post("/products")
-def add_product(product: ProductCreate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    new_product = Product(**product.dict(), admin_id=admin.id)
-    db.add(new_product)
-    db.commit()
-    db.refresh(new_product)
-    return {"msg": "Product added successfully", "product": new_product}
-
-@router.put("/products/{product_id}")
-def update_product(product_id: int, product: ProductUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    existing_product = db.query(Product).filter(Product.id == product_id).first()
-    if not existing_product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    for key, value in product.dict(exclude_unset=True).items():
-        setattr(existing_product, key, value)
-    
-    db.commit()
-    db.refresh(existing_product)
-    return {"msg": "Product updated successfully", "product": existing_product}
-
-@router.delete("/products/{product_id}")
-def delete_product(product_id: int, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    existing_product = db.query(Product).filter(Product.id == product_id).first()
-    if not existing_product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    db.delete(existing_product)
-    db.commit()
-    return {"msg": "Product deleted successfully"}
 
 #Order Management
 @router.get("/orders")

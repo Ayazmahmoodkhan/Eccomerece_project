@@ -1,7 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field,HttpUrl
+from pydantic import BaseModel, EmailStr, Field,HttpUrl, field_validator
 from datetime import date,datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 class UserRoleEnum(str,Enum):
     admin="admin"
     user="user"
@@ -84,6 +84,29 @@ class CategoryResponse(CategoryBase):
     class Config:
         from_attributes = True
 # Product Schema
+# class ProductBase(BaseModel):
+#     product_name: str
+#     price: float
+#     discount: float
+#     stock: int
+#     brand: str
+#     category_id: int
+#     description: str
+#     color: str
+#     shipping_time: str
+
+# class ProductCreate(ProductBase):
+#     images: List[str]  # Image URLs as a list of strings
+
+# class ProductResponse(ProductBase):
+#     id: int
+#     sku: str
+#     admin_id: int
+#     images: List[str]
+
+#     class Config:
+#         from_attributes = True
+
 class ProductBase(BaseModel):
     product_name: str
     price: float
@@ -96,16 +119,22 @@ class ProductBase(BaseModel):
     shipping_time: str
 
 class ProductCreate(ProductBase):
-    pass
-
-class ProductUpdate(ProductBase):
-    pass
+    images: List[str]  # Image URLs as a list of strings
 
 class ProductResponse(ProductBase):
     id: int
+    sku: str
+    images: List[str]  # admin_id ko hata diya
+
+    @field_validator(
+        "product_name", "brand", "description", "color", "shipping_time", mode="before"
+    )
+    @classmethod
+    def remove_extra_quotes(cls, value):
+        return value.strip('"') if isinstance(value, str) else value
+
     class Config:
         from_attributes = True
-
 # Cart Schema
 class CartBase(BaseModel):
     user_id: int
