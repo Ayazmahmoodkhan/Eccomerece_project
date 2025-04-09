@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field,HttpUrl, field_validator
 from datetime import date,datetime
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Any
 class UserRoleEnum(str,Enum):
     admin="admin"
     user="user"
@@ -135,21 +135,37 @@ class ProductResponse(ProductBase):
 
     class Config:
         from_attributes = True
+# Cart Item Schema
+class CartItemBase(BaseModel):
+    product_id: int
+    quantity: int
+    subtotal: float
+
+class CartItemCreate(CartItemBase):
+    pass
+
+class CartItemResponse(CartItemBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
 # Cart Schema
 class CartBase(BaseModel):
     user_id: int
-    product_id: int
-    grand_total: float
-    item_total: int
+    total_amount: float
 
 class CartCreate(CartBase):
-    pass
+    cart_items: List[CartItemCreate]
 
 class CartUpdate(CartBase):
-    pass
+    cart_items: Optional[List[CartItemCreate]] = None
 
 class CartResponse(CartBase):
     id: int
+    created_at: datetime
+    cart_items: List[CartItemResponse]
+
     class Config:
         from_attributes = True
 
@@ -195,6 +211,51 @@ class ReviewResponse(ReviewBase):
     review_id: int
     product_id: int
     customer_id: int
+
+    class Config:
+        orm_mode = True
+
+# schema for pyment table
+
+class PaymentBase(BaseModel):
+    order_id: int
+    stripe_payment_intent_id: str
+    stripe_customer_id: Optional[str] = None
+    payment_method: str
+    currency: Optional[str] = "usd"
+    amount: float
+    status: Optional[str] = "processing"
+    payment_ref: Optional[str] = None
+    paid_at: Optional[datetime] = None
+
+# Create schema
+class PaymentCreate(PaymentBase):
+    pass
+
+# Response schema
+class PaymentResponse(PaymentBase):
+    id: int
+    created_timestamp: datetime
+    updated_timestamp: Optional[datetime]
+
+    class Config:
+        orm_mode = True
+
+# schema for payments logs
+
+class PaymentLogBase(BaseModel):
+    payment_id: int
+    event_type: str
+    raw_data: Any  # Accepts JSON (dict)
+
+# Create schema
+class PaymentLogCreate(PaymentLogBase):
+    pass
+
+# Response schema
+class PaymentLogResponse(PaymentLogBase):
+    id: int
+    created_at: datetime
 
     class Config:
         orm_mode = True
