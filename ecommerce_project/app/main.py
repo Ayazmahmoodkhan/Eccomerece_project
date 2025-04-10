@@ -17,12 +17,14 @@ from app.routers.productroute import router as product_router
 from app.routers.cart import router as cart_router
 from app.routers.webhook import router as webhook_router
 from app.routers.payment import router as payment_router
+from app.routers.orders import router as order_router
 
 app=FastAPI()
 app.include_router(admin_router)
 app.include_router(category_router)
 app.include_router(product_router)
 app.include_router(cart_router)
+app.include_router(order_router)
 app.include_router(webhook_router, prefix="/webhooks", tags=["Webhooks"])
 app.include_router(payment_router, prefix="/payments", tags=["Payments"])
 app.include_router(profile_address.router, prefix="/me", tags=["Profile & Address"])

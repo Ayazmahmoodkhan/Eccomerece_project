@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, JSON, Boolean,TIMESTAMP, text, Enum, Date, ForeignKey, Float, DateTime, Text
 from app.database import Base
+from sqlalchemy.sql import func
 import enum
 from sqlalchemy.orm import relationship
 
@@ -128,6 +129,7 @@ class Cart(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False)
     total_amount = Column(Float, nullable=False)
+    grand_total = Column(Float, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="carts")
@@ -159,8 +161,10 @@ class Order(Base):
     order_status = Column(Enum(OrderStatus), nullable=False)
     cart_id = Column(Integer, ForeignKey("carts.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
+    created_timestamp = Column(DateTime, default=func.now())
+    updated_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
 
-    payments = relationship("Payment", back_populates="orders")
+    payment = relationship("Payment", back_populates="order", uselist=False)
     user = relationship("User", back_populates="orders")
     order_items = relationship("OrderItem", back_populates="order")
 
@@ -219,6 +223,7 @@ class Payment(Base):
     updated_timestamp = Column(TIMESTAMP(timezone=True), onupdate=text("now()"))
 
     # Relationships
+    
     order = relationship("Order", back_populates="payment")
     logs = relationship("PaymentLog", back_populates="payment", cascade="all, delete-orphan")
 

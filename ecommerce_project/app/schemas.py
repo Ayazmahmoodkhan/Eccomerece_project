@@ -60,11 +60,6 @@ class UserProfileResponse(UserProfileBase):
 
 
 
-class OrderStatus(str, Enum):
-    pending = "pending"
-    shipped = "shipped"
-    delivered = "delivered"
-    cancelled = "cancelled"
 
 # Category Base schema (Common fields)
 class CategoryBase(BaseModel):
@@ -169,36 +164,59 @@ class CartResponse(CartBase):
     class Config:
         from_attributes = True
 
+# Order Schema Enum
+
+class OrderStatus(str, Enum):
+    pending = "pending"
+    shipped = "shipped"
+    delivered = "delivered"
+    cancelled = "cancelled"
+
+
 # Order Schema
 class OrderBase(BaseModel):
     order_date: datetime
     order_amount: float
     shipping_date: Optional[datetime] = None
     order_status: OrderStatus
+
+class OrderCreate(OrderBase):
     cart_id: int
     user_id: int
 
-class OrderCreate(OrderBase):
-    pass
-
 class OrderUpdate(OrderBase):
-    pass
+    shipping_date: Optional[datetime] = None
+    order_status: OrderStatus
 
-class OrderResponse(OrderBase):
+class Order(OrderBase):
     id: int
+    created_timestamp: datetime
+    updated_timestamp: datetime
+
     class Config:
-        from_attributes = True
-        
-class OrderItemSchema(BaseModel):
-    id: Optional[int] = None
-    order_id: int
+        orm_mode = True
+
+# Order Item Schema
+class OrderItemBase(BaseModel):
     product_id: int
     mrp: float
     quantity: int
 
-    class Config:
-        from_attributes = True 
+class OrderItemCreate(OrderItemBase):
+    order_id: int
 
+class OrderItemUpdate(OrderItemBase):
+    product_id: Optional[int] = None
+    mrp: Optional[float] = None
+    quantity: Optional[int] = None
+
+class OrderItem(OrderItemBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+# reviews schema
 class ReviewBase(BaseModel):
     description: str
     rating: str  # ENUM (1-5) as string
