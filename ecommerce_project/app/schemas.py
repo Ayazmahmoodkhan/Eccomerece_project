@@ -2,6 +2,8 @@ from pydantic import BaseModel, EmailStr, Field,HttpUrl, field_validator
 from datetime import date,datetime
 from enum import Enum
 from typing import Optional, List, Any
+from app.models import RatingEnum
+
 class UserRoleEnum(str,Enum):
     admin="admin"
     user="user"
@@ -114,12 +116,12 @@ class ProductBase(BaseModel):
     shipping_time: str
 
 class ProductCreate(ProductBase):
-    images: List[str]  # Image URLs as a list of strings
+    images: List[str]  
 
 class ProductResponse(ProductBase):
     id: int
     sku: str
-    images: List[str]  # admin_id ko hata diya
+    images: List[str]  
 
     @field_validator(
         "product_name", "brand", "description", "color", "shipping_time", mode="before"
@@ -130,7 +132,9 @@ class ProductResponse(ProductBase):
 
     class Config:
         from_attributes = True
+
 # Cart Item Schema
+
 class CartItemBase(BaseModel):
     product_id: int
     quantity: int
@@ -146,6 +150,7 @@ class CartItemResponse(CartItemBase):
         from_attributes = True
 
 # Cart Schema
+
 class CartBase(BaseModel):
     user_id: int
     total_amount: float
@@ -173,6 +178,21 @@ class OrderStatus(str, Enum):
     cancelled = "cancelled"
 
 
+# OrderItem Schema
+class OrderItemBase(BaseModel):
+    product_id: int
+    mrp: float
+    quantity: int
+
+class OrderItemCreate(OrderItemBase):
+    pass
+
+class OrderItem(OrderItemBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 # Order Schema
 class OrderBase(BaseModel):
     order_date: datetime
@@ -183,52 +203,41 @@ class OrderBase(BaseModel):
 class OrderCreate(OrderBase):
     cart_id: int
     user_id: int
+    items: List[OrderItemCreate]  # nested order items
 
-class OrderUpdate(OrderBase):
-    shipping_date: Optional[datetime] = None
-    order_status: OrderStatus
-
-class Order(OrderBase):
+class OrderResponse(OrderBase):
     id: int
     created_timestamp: datetime
     updated_timestamp: datetime
+    items: List[OrderItem] = Field(..., alias="order_items")
+
+    class Config:
+        orm_mode = True
+        allow_population_by_field_name = True 
+
+class OrderUpdate(BaseModel):
+    order_date: Optional[datetime] = None
+    order_amount: Optional[float] = None
+    shipping_date: Optional[datetime] = None
+    order_status: Optional[OrderStatus] = None
 
     class Config:
         orm_mode = True
 
-# Order Item Schema
-class OrderItemBase(BaseModel):
-    product_id: int
-    mrp: float
-    quantity: int
-
-class OrderItemCreate(OrderItemBase):
-    order_id: int
-
-class OrderItemUpdate(OrderItemBase):
-    product_id: Optional[int] = None
-    mrp: Optional[float] = None
-    quantity: Optional[int] = None
-
-class OrderItem(OrderItemBase):
-    id: int
-
-    class Config:
-        orm_mode = True
 
 # reviews schema
 class ReviewBase(BaseModel):
     description: str
-    rating: str  # ENUM (1-5) as string
+    rating: RatingEnum 
 
 class ReviewCreate(ReviewBase):
     product_id: int
-    customer_id: int
+    user_id: int
 
 class ReviewResponse(ReviewBase):
     review_id: int
     product_id: int
-    customer_id: int
+    user_id: int
 
     class Config:
         orm_mode = True
@@ -277,3 +286,40 @@ class PaymentLogResponse(PaymentLogBase):
 
     class Config:
         orm_mode = True
+
+# shipping details schema 
+
+class ShippingDetailsBase(BaseModel):
+    order_id : int
+    contact_information: str
+    additional_note: Optional[str] = None
+    address: str
+    state:  str
+    country: str
+    shipping_date : Optional [str] = None
+
+class ShippingDetailsCreate(ShippingDetailsBase):
+    pass
+
+# shipping details update 
+
+class ShippingDetailsUpdate(BaseModel):
+    contact_information: Optional[str] = None
+    additional_note: Optional[str] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    shipping_date: Optional[datetime] = None
+
+# shipping details response
+
+class ShippingDetailsResponse(ShippingDetailsBase):
+    id : int
+    created_timestamp: datetime
+    updated_timestamp: Optional[datetime]
+
+    class config:
+        orm_mode: True
+
+
+

@@ -11,10 +11,10 @@ class UserRole(str, enum.Enum):
     user = "user"
 
 class OrderStatus(str, enum.Enum):
-    pending = "Pending"
-    shipped = "Shipped"
-    delivered = "Delivered"
-    cancelled = "Cancelled"
+    pending = "pending"
+    shipped = "shipped"
+    delivered = "delivered"
+    cancelled = "cancelled"
 
 class PaymentMode(str, enum.Enum):
     credit_card = "Credit Card"
@@ -22,12 +22,12 @@ class PaymentMode(str, enum.Enum):
     paypal = "PayPal"
     cash_on_delivery = "Cash on Delivery"
 
-class RatingEnum(str, enum.Enum):
-    one_star = "1 Star"
-    two_star = "2 Stars"
-    three_star = "3 Stars"
-    four_star = "4 Stars"
-    five_star = "5 Stars"
+class RatingEnum(int, enum.Enum):
+    one_star = 1
+    two_star = 2
+    three_star = 3
+    four_star = 4
+    five_star = 5
 
 # User Table
 class User(Base):
@@ -154,6 +154,7 @@ class CartItem(Base):
 # Order Table
 class Order(Base):
     __tablename__ = "orders"
+    
     id = Column(Integer, primary_key=True, index=True)
     order_date = Column(DateTime, nullable=False)
     order_amount = Column(Float, nullable=False)
@@ -164,21 +165,32 @@ class Order(Base):
     created_timestamp = Column(DateTime, default=func.now())
     updated_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
 
+    # Relationships
     payment = relationship("Payment", back_populates="order", uselist=False)
     user = relationship("User", back_populates="orders")
-    order_items = relationship("OrderItem", back_populates="order")
+    order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    shipping_details = relationship("ShippingDetails", back_populates="order", uselist=False)
+
+    class Config:
+        orm_mode = True
 
 # Order Item Table
 class OrderItem(Base):
     __tablename__ = "order_items"
+    
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"))
     mrp = Column(Float, nullable=False)
     quantity = Column(Integer, nullable=False)
 
+    # Relationships
     order = relationship("Order", back_populates="order_items")
     product = relationship("Product", back_populates="order_items")
+
+    class Config:
+        orm_mode = True
+
 
 # Review Table
 class Review(Base):
@@ -244,21 +256,23 @@ class PaymentLog(Base):
 
 
 
-# class ShippingDetails(Base):
-#     __tablename__ = "shipping_details"
-#     id = Column(Integer, primary_key=True, nullable=False)
-#     order_id = Column(
-#         Integer,
-#         ForeignKey(column="orders.id", ondelete="CASCADE", onupdate="CASCADE"),
-#         nullable=False,
-#     )
-#     contact_information = Column(String, nullable=False)
-#     additional_note = Column(String, nullable=True)
-#     address = Column(String, nullable=False)
-#     state = Column(String, nullable=False)
-#     country = Column(String, nullable=False)
-#     shipping_date = Column(TIMESTAMP(timezone=True))
-#     created_timestamp = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
-#     updated_timestamp = Column(TIMESTAMP(timezone=True), nullable=True)
+class ShippingDetails(Base):
+    __tablename__ = "shipping_details"
+    id = Column(Integer, primary_key=True, nullable=False)
+    order_id = Column(
+        Integer,
+        ForeignKey(column="orders.id", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=False,
+    )
+    contact_information = Column(String, nullable=False)
+    additional_note = Column(String, nullable=True)
+    address = Column(String, nullable=False)
+    state = Column(String, nullable=False)
+    country = Column(String, nullable=False)
+    shipping_date = Column(TIMESTAMP(timezone=True))
+    created_timestamp = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
+    updated_timestamp = Column(TIMESTAMP(timezone=True), nullable=True)
 
-#     order = relationship("Order", back_populates="shipping_details")
+    order = relationship("Order", back_populates="shipping_details")
+
+    
