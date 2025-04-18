@@ -49,3 +49,15 @@ def send_email_background(background_tasks: BackgroundTasks, subject: str, email
     fm = FastMail(conf)
     background_tasks.add_task(fm.send_message, message)
 
+# payment confirmation email
+
+def send_payment_confirmation(background_tasks: BackgroundTasks, email_to: str, name: str, order_id: int, amount: float):
+    subject = "Payment Confirmation - Order #" + str(order_id)
+    body = {
+        "title": "Payment Successful",
+        "name": name,
+        "order_id": order_id,
+        "amount": f"${amount / 100:.2f}",
+    }
+
+    send_email_background(background_tasks, subject, email_to, body)

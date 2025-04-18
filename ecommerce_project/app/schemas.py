@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field,HttpUrl, field_validator
 from datetime import date,datetime
 from enum import Enum
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from app.models import RatingEnum
 
 class UserRoleEnum(str,Enum):
@@ -223,7 +223,40 @@ class OrderUpdate(BaseModel):
 
     class Config:
         orm_mode = True
+# Cancel order request
+class OrderCancelRequest(BaseModel):
+    cancel_reason: Optional[str] = None
 
+class OrderCancelResponse(BaseModel):
+    id: int
+    is_canceled: bool
+    cancel_reason: Optional[str]
+
+    class Config:
+        orm_mode = True
+# Apply Coupon Request in Order
+
+class ApplyCouponRequest(BaseModel):
+    coupon_code: str
+
+# Coupons Schema
+
+class CouponBase(BaseModel):
+    code: str
+    discount_type: Literal["percentage", "fixed"]
+    discount_value: float
+    expiry_date: Optional[datetime] = None
+    usage_limit: Optional[int] = None
+
+class CouponCreate(CouponBase):
+    pass
+
+class CouponResponse(CouponBase):
+    id: int
+    is_active: bool
+
+    class Config:
+        orm_mode = True
 
 # reviews schema
 class ReviewBase(BaseModel):
@@ -244,22 +277,35 @@ class ReviewResponse(ReviewBase):
 
 # schema for pyment table
 
+class PaymentMode(str, Enum):
+    credit_card = "Credit Card"
+    debit_card = "Debit Card"
+    paypal = "PayPal"
+    cash_on_delivery = "Cash on Delivery"
+
+
 class PaymentBase(BaseModel):
     order_id: int
-    stripe_payment_intent_id: str
+    stripe_payment_intent_id: Optional[str] = None
     stripe_customer_id: Optional[str] = None
-    payment_method: str
+    payment_method: PaymentMode
     currency: Optional[str] = "usd"
     amount: float
     status: Optional[str] = "processing"
     payment_ref: Optional[str] = None
     paid_at: Optional[datetime] = None
 
-# Create schema
+
 class PaymentCreate(PaymentBase):
     pass
 
-# Response schema
+class PaymentIntentRequest(BaseModel):
+    amount: float
+    currency: str = "usd"
+    payment_method: PaymentMode 
+    metadata: Optional[dict] = None
+    order_id: int
+
 class PaymentResponse(PaymentBase):
     id: int
     created_timestamp: datetime
@@ -270,22 +316,35 @@ class PaymentResponse(PaymentBase):
 
 # schema for payments logs
 
-class PaymentLogBase(BaseModel):
+class PaymentLogCreate(BaseModel):
     payment_id: int
-    event_type: str
-    raw_data: Any  # Accepts JSON (dict)
+    status: str
+    message: Optional[str] = None
 
-# Create schema
-class PaymentLogCreate(PaymentLogBase):
-    pass
 
-# Response schema
-class PaymentLogResponse(PaymentLogBase):
+class PaymentLogResponse(PaymentLogCreate):
     id: int
+    timestamp: datetime
+
+    class Config:
+        orm_mode = True
+
+# Refund Payments Schema
+
+
+class RefundResponse(BaseModel):
+    id: int
+    order_id: int
+    stripe_refund_id: str
+    amount: float
+    reason: str | None = None
+    status: str
     created_at: datetime
 
     class Config:
         orm_mode = True
+
+
 
 # shipping details schema 
 

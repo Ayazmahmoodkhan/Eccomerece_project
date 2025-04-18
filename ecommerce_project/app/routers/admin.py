@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 from app.schemas import  UserCreate
 from app.auth import get_current_user
 from app.utils import pwd_context
+from typing import List
 from app.database import get_db
-from app.models import User, Product, Order, Category
-from app.schemas import ProductCreate, OrderUpdate, CategoryResponse
+from app.models import User, Product, Order, Category, Refund
+from app.schemas import ProductCreate, OrderUpdate, CategoryResponse, RefundResponse
 router=APIRouter()
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -75,6 +76,15 @@ def update_order_status(order_id: int, order_update: OrderUpdate, admin: User = 
     db.commit()
     db.refresh(order)
     return {"msg": "Order status updated successfully", "order": order}
+
+# Admins checks refunds 
+@router.get("/refunds", response_model=List[RefundResponse])
+def get_all_refunds(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(admin_required)
+):
+    refunds = db.query(Refund).all()
+    return refunds
 
 # # User Management
 # @router.get("/users")

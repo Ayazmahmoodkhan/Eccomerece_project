@@ -14,9 +14,21 @@ class Settings(BaseSettings):
     stripe_secret_key: str
     stripe_webhook_secret: str
 
-    class Config:
+stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY")
+
+class Config:
         env_file = ".env"
         extra = "allow"  # This allows extra fields like stripe_secret_key and stripe_webhook_secret
+class Settings(BaseSettings):
+    stripe_secret_key: str
+    frontend_url: str
+    # other fields
+
+    class Config:
+        env_file = ".env"
+        extra = "ignore" 
 
 # Instantiate the settings
 settings = Settings()
+
+

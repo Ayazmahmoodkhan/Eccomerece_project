@@ -3,7 +3,7 @@ from fastapi_mail import FastMail, MessageSchema
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 from app.database import get_db, Base , engine
-from app.models import User,UserProfile, Address, Category, Product, Cart, Order, OrderItem,Review,Payment,ProductImage
+from app.models import User
 from app.schemas import UserCreate, UserLogin,ResetPasswordRequest
 from app.utils import hash_password, verify_password , pwd_context, create_reset_token, verify_reset_token
 from app.auth import create_access_token
@@ -22,16 +22,7 @@ from app.routers.reviews import router as review_router
 from app.routers.shipping_details import router as shippingdetails_router
 
 app=FastAPI()
-app.include_router(admin_router)
-app.include_router(category_router)
-app.include_router(product_router)
-app.include_router(review_router)
-app.include_router(cart_router)
-app.include_router(order_router)
-app.include_router(shippingdetails_router)
-app.include_router(webhook_router, prefix="/webhooks", tags=["Webhooks"])
-app.include_router(payment_router, prefix="/payments", tags=["Payments"])
-app.include_router(profile_address.router, prefix="/me", tags=["Profile & Address"])
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -43,7 +34,7 @@ def register(user:UserCreate,background_tasks:BackgroundTasks,db:Session=Depends
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Passwords do not match")
     existing_user=db.query(User).filter((User.username==user.username) | (User.email == user.email)).first()
     if existing_user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,details="Username or Email already exists")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Username or Email already exists")
     new_user=User(
         name=user.name,
         username=user.username,
@@ -82,6 +73,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 #register & login end
+
 #forgot password reset start
 FRONTEND_BASE_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5500")
 from app.send_email import conf
@@ -131,3 +123,16 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
     db.commit()
     return {"message": "Password updated successfully"}
 #forgot password reset end
+
+# Routers  
+
+app.include_router(profile_address.router, prefix="/user", tags=["User Profile & Address"])
+app.include_router(admin_router)
+app.include_router(product_router)
+app.include_router(category_router)
+app.include_router(review_router)
+app.include_router(cart_router)
+app.include_router(order_router)
+app.include_router(shippingdetails_router)
+app.include_router(webhook_router)
+app.include_router(payment_router)

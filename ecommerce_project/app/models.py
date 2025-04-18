@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, JSON, Boolean,TIMESTAMP, text, Enum, Date, ForeignKey, Float, DateTime, Text
 from app.database import Base
 from sqlalchemy.sql import func
+from datetime import datetime
 import enum
 from sqlalchemy.orm import relationship
 
@@ -160,6 +161,10 @@ class Order(Base):
     order_amount = Column(Float, nullable=False)
     shipping_date = Column(DateTime, nullable=True)
     order_status = Column(Enum(OrderStatus), nullable=False)
+    is_canceled = Column(Boolean, default=False)
+    cancel_reason = Column(String, nullable=True)
+    coupon_code = Column(String, nullable=True)
+    discount_amount = Column(Float, default=0.0)
     cart_id = Column(Integer, ForeignKey("carts.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
     created_timestamp = Column(DateTime, default=func.now())
@@ -170,6 +175,8 @@ class Order(Base):
     user = relationship("User", back_populates="orders")
     order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     shipping_details = relationship("ShippingDetails", back_populates="order", uselist=False)
+    refunds = relationship("Refund", back_populates="order", cascade="all, delete")
+
 
     class Config:
         orm_mode = True
@@ -220,22 +227,20 @@ class Review(Base):
 
 class Payment(Base):
     __tablename__ = "payments"
-    
+
     id = Column(Integer, primary_key=True, nullable=False)
     order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, unique=True)
-    stripe_payment_intent_id = Column(String, nullable=False, unique=True)  # From Stripe
+    stripe_payment_intent_id = Column(String, nullable=False, unique=True)
     stripe_customer_id = Column(String, nullable=True)
-    payment_method = Column(String, nullable=False)  # card, upi, etc.
+    payment_method = Column(String, nullable=False)
     currency = Column(String, default="usd")
     amount = Column(Float, nullable=False)
-    status = Column(String, default="processing")  # succeeded, failed, etc.
-    payment_ref = Column(String, nullable=True, unique=True)  # custom ref if needed
-    paid_at = Column(TIMESTAMP(timezone=True))
+    status = Column(String, default="processing")
+    payment_ref = Column(String, nullable=True, unique=True)
+    paid_at = Column(TIMESTAMP(timezone=True), nullable=True)
     created_timestamp = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
     updated_timestamp = Column(TIMESTAMP(timezone=True), onupdate=text("now()"))
 
-    # Relationships
-    
     order = relationship("Order", back_populates="payment")
     logs = relationship("PaymentLog", back_populates="payment", cascade="all, delete-orphan")
 
@@ -244,15 +249,13 @@ class Payment(Base):
 class PaymentLog(Base):
     __tablename__ = "payment_logs"
 
-    id = Column(Integer, primary_key=True)
-    payment_id = Column(Integer, ForeignKey("payments.id", ondelete="CASCADE"))
-    event_type = Column(String, nullable=False)  # e.g., payment_intent.succeeded
-    raw_data = Column(JSON, nullable=False)  # Full payload from Stripe
+    id = Column(Integer, primary_key=True, index=True)
+    payment_id = Column(Integer, ForeignKey("payments.id"), nullable=False)
+    status = Column(String, nullable=False)  # Make sure this line exists
+    message = Column(String, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
 
-    # Relationship
     payment = relationship("Payment", back_populates="logs")
-
 
 
 
@@ -275,4 +278,28 @@ class ShippingDetails(Base):
 
     order = relationship("Order", back_populates="shipping_details")
 
-    
+# Coupons table
+class Coupon(Base):
+    __tablename__ = "coupons"
+    id = Column(Integer, primary_key=True)
+    code = Column(String, unique=True, nullable=False)
+    discount_type = Column(Enum("percentage", "fixed", name="discounttype"), nullable=False)
+    discount_value = Column(Float, nullable=False)
+    is_active = Column(Boolean, default=True)
+    expiry_date = Column(DateTime, nullable=True)
+    usage_limit = Column(Integer, nullable=True)
+
+# Refunds Table
+
+class Refund(Base):
+    __tablename__ = "refunds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"))
+    stripe_refund_id = Column(String, nullable=False)
+    amount = Column(Float, nullable=False)
+    reason = Column(Text, nullable=True)
+    status = Column(String, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    order = relationship("Order", back_populates="refunds")

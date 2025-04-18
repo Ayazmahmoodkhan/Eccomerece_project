@@ -1,19 +1,25 @@
-from fastapi import APIRouter, Request, Header, HTTPException, Depends
-from sqlalchemy.orm import Session
 import stripe
-from app.config import settings
-from app.models import PaymentLog
-from app.database import get_db
+from fastapi import APIRouter, Request, Header, HTTPException, status, Depends, BackgroundTasks
+from sqlalchemy.orm import Session
 from datetime import datetime
 
-router = APIRouter()
+from app.config import settings
+from app.database import get_db
+from app.models import Payment, Order, User
+from app.send_email import send_payment_confirmation
+
+router = APIRouter(prefix="/webhook", tags=["Stripe Webhook"])
+
+# Set your secret key
 stripe.api_key = settings.stripe_secret_key
+
 
 @router.post("/stripe")
 async def stripe_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     stripe_signature: str = Header(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     payload = await request.body()
 
@@ -21,27 +27,35 @@ async def stripe_webhook(
         event = stripe.Webhook.construct_event(
             payload=payload,
             sig_header=stripe_signature,
-            secret=settings.STRIPE_WEBHOOK_SECRET
+            secret=settings.stripe_webhook_secret
         )
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature")
 
-    # Save to Payment Logs Table
-    db_log = PaymentLog(
-        event_id=event.id,
-        event_type=event.type,
-        payload=payload.decode(),
-        received_at=datetime.utcnow()
-    )
-    db.add(db_log)
-    db.commit()
-
-    # Optional: Update Payment Status based on event
     if event["type"] == "payment_intent.succeeded":
         intent = event["data"]["object"]
-        print("Payment succeeded for:", intent["id"])
-        # you could query Payment table and update status to 'succeeded'
+        stripe_payment_intent_id = intent["id"]
+
+        # Get the related payment
+        payment = db.query(Payment).filter(Payment.stripe_payment_intent_id == stripe_payment_intent_id).first()
+
+        if payment and payment.status != "succeeded":
+            payment.status = "succeeded"
+            payment.paid_at = datetime.utcnow()
+            db.commit()
+
+            # Fetch related order and user
+            order = db.query(Order).filter(Order.id == payment.order_id).first()
+            user = db.query(User).filter(User.id == order.user_id).first() if order else None
+
+            # Send payment confirmation email
+            if user:
+                send_payment_confirmation(
+                    background_tasks,
+                    email_to=user.email,
+                    name=user.name,
+                    order_id=payment.order_id,
+                    amount=payment.amount
+                )
 
     return {"status": "success"}

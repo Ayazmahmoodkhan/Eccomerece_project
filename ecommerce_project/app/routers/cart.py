@@ -7,17 +7,17 @@ from typing import List
 
 router = APIRouter(prefix="/carts", tags=["Carts"])
 
-# Create Cart Endpoint (Already provided)
+# Create Cart Endpoint 
 @router.post("/", response_model=CartResponse, status_code=status.HTTP_201_CREATED)
 def create_cart(cart_data: CartCreate, db: Session = Depends(get_db)):
-    # Calculate the grand_total by summing the subtotals of the cart items
+
     grand_total = sum(item.subtotal for item in cart_data.cart_items)
 
     # Create the Cart object with the grand_total
     cart = Cart(
         user_id=cart_data.user_id,
         total_amount=cart_data.total_amount,
-        grand_total=grand_total  # Ensure grand_total is included here
+        grand_total=grand_total 
     )
 
     db.add(cart)
@@ -43,7 +43,7 @@ def create_cart(cart_data: CartCreate, db: Session = Depends(get_db)):
 
     return cart
 
-# Get Cart Endpoint (Already provided)
+# Get Cart Endpoint
 @router.get("/{cart_id}", response_model=CartResponse)
 def get_cart(cart_id: int, db: Session = Depends(get_db)):
     cart = db.query(Cart).filter(Cart.id == cart_id).first()
