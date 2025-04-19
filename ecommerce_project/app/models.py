@@ -207,6 +207,7 @@ class Review(Base):
     rating = Column(Enum(RatingEnum), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at  = Column(DateTime(timezone= True), server_default=func.now())
 
     product = relationship("Product", back_populates="reviews")
     user = relationship("User", back_populates="reviews")

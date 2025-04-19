@@ -133,7 +133,10 @@ class ProductResponse(ProductBase):
     class Config:
         from_attributes = True
 
-# Cart Item Schema
+
+
+# Cart Item Schemas
+
 
 class CartItemBase(BaseModel):
     product_id: int
@@ -147,13 +150,13 @@ class CartItemResponse(CartItemBase):
     id: int
 
     class Config:
-        from_attributes = True
+        from_attributes = True  
 
-# Cart Schema
+
+# Cart Schemas
 
 class CartBase(BaseModel):
-    user_id: int
-    total_amount: float
+    total_amount: float  
 
 class CartCreate(CartBase):
     cart_items: List[CartItemCreate]
@@ -169,7 +172,8 @@ class CartResponse(CartBase):
     class Config:
         from_attributes = True
 
-# Order Schema Enum
+
+# Order Enum
 
 class OrderStatus(str, Enum):
     pending = "pending"
@@ -203,7 +207,7 @@ class OrderBase(BaseModel):
 class OrderCreate(OrderBase):
     cart_id: int
     user_id: int
-    items: List[OrderItemCreate]  # nested order items
+    items: List[OrderItemCreate] 
 
 class OrderResponse(OrderBase):
     id: int
@@ -259,18 +263,18 @@ class CouponResponse(CouponBase):
         orm_mode = True
 
 # reviews schema
-class ReviewBase(BaseModel):
-    description: str
-    rating: RatingEnum 
-
-class ReviewCreate(ReviewBase):
+class ReviewCreate(BaseModel):
     product_id: int
-    user_id: int
+    rating: int
+    description: str
 
-class ReviewResponse(ReviewBase):
+class ReviewResponse(BaseModel):
     review_id: int
     product_id: int
     user_id: int
+    rating: int
+    description: str
+    created_at: datetime
 
     class Config:
         orm_mode = True
