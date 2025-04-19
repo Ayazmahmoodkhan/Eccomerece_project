@@ -1,7 +1,9 @@
 from pydantic import BaseModel, EmailStr, Field,HttpUrl, field_validator
 from datetime import date,datetime
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Any, Literal
+from app.models import RatingEnum
+
 class UserRoleEnum(str,Enum):
     admin="admin"
     user="user"
@@ -60,11 +62,6 @@ class UserProfileResponse(UserProfileBase):
 
 
 
-class OrderStatus(str, Enum):
-    pending = "pending"
-    shipped = "shipped"
-    delivered = "delivered"
-    cancelled = "cancelled"
 
 # Category Base schema (Common fields)
 class CategoryBase(BaseModel):
@@ -119,12 +116,12 @@ class ProductBase(BaseModel):
     shipping_time: str
 
 class ProductCreate(ProductBase):
-    images: List[str]  # Image URLs as a list of strings
+    images: List[str]  
 
 class ProductResponse(ProductBase):
     id: int
     sku: str
-    images: List[str]  # admin_id ko hata diya
+    images: List[str]  
 
     @field_validator(
         "product_name", "brand", "description", "color", "shipping_time", mode="before"
@@ -135,23 +132,66 @@ class ProductResponse(ProductBase):
 
     class Config:
         from_attributes = True
+
+# Cart Item Schema
+
+class CartItemBase(BaseModel):
+    product_id: int
+    quantity: int
+    subtotal: float
+
+class CartItemCreate(CartItemBase):
+    pass
+
+class CartItemResponse(CartItemBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
 # Cart Schema
+
 class CartBase(BaseModel):
     user_id: int
-    product_id: int
-    grand_total: float
-    item_total: int
+    total_amount: float
 
 class CartCreate(CartBase):
-    pass
+    cart_items: List[CartItemCreate]
 
 class CartUpdate(CartBase):
-    pass
+    cart_items: Optional[List[CartItemCreate]] = None
 
 class CartResponse(CartBase):
     id: int
+    created_at: datetime
+    cart_items: List[CartItemResponse]
+
     class Config:
         from_attributes = True
+
+# Order Schema Enum
+
+class OrderStatus(str, Enum):
+    pending = "pending"
+    shipped = "shipped"
+    delivered = "delivered"
+    cancelled = "cancelled"
+
+
+# OrderItem Schema
+class OrderItemBase(BaseModel):
+    product_id: int
+    mrp: float
+    quantity: int
+
+class OrderItemCreate(OrderItemBase):
+    pass
+
+class OrderItem(OrderItemBase):
+    id: int
+
+    class Config:
+        orm_mode = True
 
 # Order Schema
 class OrderBase(BaseModel):
@@ -159,42 +199,186 @@ class OrderBase(BaseModel):
     order_amount: float
     shipping_date: Optional[datetime] = None
     order_status: OrderStatus
-    cart_id: int
-    user_id: int
 
 class OrderCreate(OrderBase):
-    pass
-
-class OrderUpdate(OrderBase):
-    pass
+    cart_id: int
+    user_id: int
+    items: List[OrderItemCreate]  # nested order items
 
 class OrderResponse(OrderBase):
     id: int
-    class Config:
-        from_attributes = True
-        
-class OrderItemSchema(BaseModel):
-    id: Optional[int] = None
-    order_id: int
-    product_id: int
-    mrp: float
-    quantity: int
+    created_timestamp: datetime
+    updated_timestamp: datetime
+    items: List[OrderItem] = Field(..., alias="order_items")
 
     class Config:
-        from_attributes = True 
+        orm_mode = True
+        allow_population_by_field_name = True 
 
+class OrderUpdate(BaseModel):
+    order_date: Optional[datetime] = None
+    order_amount: Optional[float] = None
+    shipping_date: Optional[datetime] = None
+    order_status: Optional[OrderStatus] = None
+
+    class Config:
+        orm_mode = True
+# Cancel order request
+class OrderCancelRequest(BaseModel):
+    cancel_reason: Optional[str] = None
+
+class OrderCancelResponse(BaseModel):
+    id: int
+    is_canceled: bool
+    cancel_reason: Optional[str]
+
+    class Config:
+        orm_mode = True
+# Apply Coupon Request in Order
+
+class ApplyCouponRequest(BaseModel):
+    coupon_code: str
+
+# Coupons Schema
+
+class CouponBase(BaseModel):
+    code: str
+    discount_type: Literal["percentage", "fixed"]
+    discount_value: float
+    expiry_date: Optional[datetime] = None
+    usage_limit: Optional[int] = None
+
+class CouponCreate(CouponBase):
+    pass
+
+class CouponResponse(CouponBase):
+    id: int
+    is_active: bool
+
+    class Config:
+        orm_mode = True
+
+# reviews schema
 class ReviewBase(BaseModel):
     description: str
-    rating: str  # ENUM (1-5) as string
+    rating: RatingEnum 
 
 class ReviewCreate(ReviewBase):
     product_id: int
-    customer_id: int
+    user_id: int
 
 class ReviewResponse(ReviewBase):
     review_id: int
     product_id: int
-    customer_id: int
+    user_id: int
 
     class Config:
         orm_mode = True
+
+# schema for pyment table
+
+class PaymentMode(str, Enum):
+    credit_card = "Credit Card"
+    debit_card = "Debit Card"
+    paypal = "PayPal"
+    cash_on_delivery = "Cash on Delivery"
+
+
+class PaymentBase(BaseModel):
+    order_id: int
+    stripe_payment_intent_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    payment_method: PaymentMode
+    currency: Optional[str] = "usd"
+    amount: float
+    status: Optional[str] = "processing"
+    payment_ref: Optional[str] = None
+    paid_at: Optional[datetime] = None
+
+
+class PaymentCreate(PaymentBase):
+    pass
+
+class PaymentIntentRequest(BaseModel):
+    amount: float
+    currency: str = "usd"
+    payment_method: PaymentMode 
+    metadata: Optional[dict] = None
+    order_id: int
+
+class PaymentResponse(PaymentBase):
+    id: int
+    created_timestamp: datetime
+    updated_timestamp: Optional[datetime]
+
+    class Config:
+        orm_mode = True
+
+# schema for payments logs
+
+class PaymentLogCreate(BaseModel):
+    payment_id: int
+    status: str
+    message: Optional[str] = None
+
+
+class PaymentLogResponse(PaymentLogCreate):
+    id: int
+    timestamp: datetime
+
+    class Config:
+        orm_mode = True
+
+# Refund Payments Schema
+
+
+class RefundResponse(BaseModel):
+    id: int
+    order_id: int
+    stripe_refund_id: str
+    amount: float
+    reason: str | None = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+
+# shipping details schema 
+
+class ShippingDetailsBase(BaseModel):
+    order_id : int
+    contact_information: str
+    additional_note: Optional[str] = None
+    address: str
+    state:  str
+    country: str
+    shipping_date : Optional [str] = None
+
+class ShippingDetailsCreate(ShippingDetailsBase):
+    pass
+
+# shipping details update 
+
+class ShippingDetailsUpdate(BaseModel):
+    contact_information: Optional[str] = None
+    additional_note: Optional[str] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    shipping_date: Optional[datetime] = None
+
+# shipping details response
+
+class ShippingDetailsResponse(ShippingDetailsBase):
+    id : int
+    created_timestamp: datetime
+    updated_timestamp: Optional[datetime]
+
+    class config:
+        orm_mode: True
+
+
+

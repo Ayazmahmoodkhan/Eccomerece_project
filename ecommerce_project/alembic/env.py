@@ -1,10 +1,18 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import os
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 from logging.config import fileConfig
+from app.database import Base, engine
 
 # Alembic Config
 config = context.config
+
+
 
 # Logging Setup
 fileConfig(config.config_file_name)

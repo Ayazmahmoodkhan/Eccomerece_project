@@ -8,7 +8,7 @@ from app.routers.admin import admin_required
 from typing import Optional, List
 from uuid import uuid4
 import os, uuid
-router = APIRouter()
+
 router=APIRouter(prefix="/product", tags=["Product panel"])
 #Product Management
 # @router.get("/products", response_model=List[ProductResponse])
