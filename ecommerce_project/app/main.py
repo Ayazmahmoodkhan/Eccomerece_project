@@ -11,6 +11,16 @@ from app.send_email import send_email_background
 import os
 from fastapi.responses import RedirectResponse
 from app.routers import profile_address
+
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.openapi.utils import get_openapi
+from fastapi.middleware.cors import CORSMiddleware
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")  # Or your login endpoint
+
+
+
 from app.routers.admin import router as admin_router
 from app.routers.categoryroute import router as category_router
 from app.routers.productroute import router as product_router
@@ -41,7 +51,7 @@ def register(user:UserCreate,background_tasks:BackgroundTasks,db:Session=Depends
         email=user.email,
         hashed_password=hash_password(user.password),
         is_active=True,
-        role=user.role
+        role="user"
     )
     db.add(new_user)
     db.commit()

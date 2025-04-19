@@ -39,12 +39,14 @@ def admin_required(current_user=Depends(get_current_user)):
     return current_user
 
 # Admin Profile & Stats
+from sqlalchemy import func
 @router.get("/admin-profile")
 def get_admin_profile(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
     total_products = db.query(Product).count()
     total_orders = db.query(Order).count()
     total_sales = db.query(Order).filter(Order.order_status == "delivered").count()
-    total_revenue = db.query(Order).filter(Order.order_status == "delivered").with_entities(Order.order_amount).sum()
+    total_revenue = db.query(func.sum(Order.order_amount)).filter(Order.order_status == "delivered").scalar()
+  #  total_revenue = db.query(Order).filter(Order.order_status == "delivered").with_entities(Order.order_amount).sum()
 
     return {
         "admin_name": admin.name,
@@ -123,7 +125,7 @@ def get_all_refunds(
 #Reports & Analytics
 @router.get("/reports")
 def get_reports(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    total_revenue = db.query(Order).filter(Order.order_status == "delivered").with_entities(Order.order_amount).sum()
+    total_revenue = db.query(func.sum(Order.order_amount)).filter(Order.order_status == "delivered").scalar()
     total_orders = db.query(Order).count()
     total_users = db.query(User).filter(User.role == "user").count()
 
