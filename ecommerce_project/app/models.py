@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 from datetime import datetime
 import enum
 from sqlalchemy.orm import relationship
-
+from pydantic import ConfigDict
 
 # Enums
 class UserRole(str, enum.Enum):
@@ -46,7 +46,7 @@ class User(Base):
     addresses = relationship("Address", back_populates="user")
     products = relationship("Product", back_populates="admin")
     orders = relationship("Order", back_populates="user")
-    carts = relationship("Cart", back_populates="user")
+    # carts = relationship("Cart", back_populates="user")
     reviews = relationship("Review", back_populates="user")
 
 # User Profile Table
@@ -82,77 +82,112 @@ class Category(Base):
     description = Column(String, nullable=True)
 
     products = relationship("Product", back_populates="category",cascade="all, delete")
+    variant_attributes = relationship("CategoryVariantAttribute", back_populates="category")
 
-# Product Table
+class VariantAttribute(Base):
+    __tablename__ = "variant_attributes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)  # e.g., size, color, ram
+
+    categories = relationship("CategoryVariantAttribute", back_populates="attribute")
+class CategoryVariantAttribute(Base):
+    __tablename__ = "category_variant_attributes"
+
+    id = Column(Integer, primary_key=True)
+    category_id = Column(Integer, ForeignKey("categories.id"))
+    attribute_id = Column(Integer, ForeignKey("variant_attributes.id"))
+
+    category = relationship("Category", back_populates="variant_attributes")
+    attribute = relationship("VariantAttribute", back_populates="categories")
+
+from sqlalchemy.dialects.postgresql import ARRAY
+# Product Table (same as before)
 class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
-    sku = Column(String, nullable=False, unique=True)  # Unique product identifier
+    sku = Column(String, nullable=False, unique=True)
     product_name = Column(String, nullable=False)
     description = Column(Text)
-    color = Column(String, nullable=True)
-    price = Column(Float, nullable=False)
-    discount = Column(Float, nullable=False)
-    stock = Column(Integer, nullable=False)
     brand = Column(String, nullable=False)
-    shipping_time = Column(String, nullable=True)
-
     category_id = Column(Integer, ForeignKey("categories.id"))
     admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
 
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
     # Relationships
-    cart_items = relationship("CartItem", back_populates="product")
     category = relationship("Category", back_populates="products")
     admin = relationship("User", back_populates="products")
+    variants = relationship("ProductVariant", back_populates="product", cascade="all, delete-orphan")
     reviews = relationship("Review", back_populates="product")
     order_items = relationship("OrderItem", back_populates="product")
-    images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
 
-
-# Product Image Table
+   
+# New: PorductImage Table
 class ProductImage(Base):
     __tablename__ = "product_images"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"))
+    variant_id = Column(Integer, ForeignKey("product_variants.id", ondelete="CASCADE"))
     image_url = Column(String, nullable=False)
 
     # Relationship
-    product = relationship("Product", back_populates="images")
+    variant = relationship("ProductVariant", back_populates="images")
 
+#  Update: ProductVariant Table
+class ProductVariant(Base):
+    __tablename__ = "product_variants"
 
-# Cart Table
-class Cart(Base):
-    __tablename__ = "carts"
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"))
 
-    id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False)
-    total_amount = Column(Float, nullable=False)
-    grand_total = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    stock = Column(Integer, nullable=False)
+    discount = Column(Integer, default=0)
+    shipping_time = Column(Integer, nullable=True)
+    attributes = Column(JSON, nullable=True, default={})
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", back_populates="carts")
-    cart_items = relationship("CartItem", back_populates="cart")
+    product = relationship("Product", back_populates="variants")
+    order_items = relationship("OrderItem", back_populates="variant")
+    images = relationship("ProductImage", back_populates="variant", cascade="all, delete-orphan")
+
+# Cart Table
+# class Cart(Base):
+#     __tablename__ = "carts"
+
+#     id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
+#     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+#     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False)
+#     total_amount = Column(Float, nullable=False)
+#     grand_total = Column(Float, nullable=False)
+
+#     # Relationships
+#     user = relationship("User", back_populates="carts")
+#     cart_items = relationship("CartItem", back_populates="cart")
 
 
 # CartItem Table
-class CartItem(Base):
-    __tablename__ = "cart_items"
+# class CartItem(Base):
+#     __tablename__ = "cart_items"
 
-    id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
-    cart_id = Column(Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    quantity = Column(Integer, nullable=False)
-    subtotal = Column(Float, nullable=False)
+#     id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
+#     cart_id = Column(Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False)
+#     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+#     quantity = Column(Integer, nullable=False)
+#     subtotal = Column(Float, nullable=False)
 
-    # Relationships
-    cart = relationship("Cart", back_populates="cart_items")
-    product = relationship("Product", back_populates="cart_items")
+#     # Relationships
+#     cart = relationship("Cart", back_populates="cart_items")
+#     product = relationship("Product", back_populates="cart_items")
 
 
-# Order Table
+#Order Table
 class Order(Base):
     __tablename__ = "orders"
     
@@ -165,7 +200,7 @@ class Order(Base):
     cancel_reason = Column(String, nullable=True)
     coupon_code = Column(String, nullable=True)
     discount_amount = Column(Float, default=0.0)
-    cart_id = Column(Integer, ForeignKey("carts.id"))
+    # cart_id = Column(Integer, ForeignKey("carts.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
     created_timestamp = Column(DateTime, default=func.now())
     updated_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -180,7 +215,7 @@ class Order(Base):
 
     class Config:
         orm_mode = True
-
+from sqlalchemy.sql import func
 # Order Item Table
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -188,13 +223,14 @@ class OrderItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"))
+    variant_id = Column(Integer, ForeignKey("product_variants.id"))
     mrp = Column(Float, nullable=False)
     quantity = Column(Integer, nullable=False)
 
     # Relationships
     order = relationship("Order", back_populates="order_items")
     product = relationship("Product", back_populates="order_items")
-
+    variant = relationship("ProductVariant", back_populates="order_items")
     class Config:
         orm_mode = True
 

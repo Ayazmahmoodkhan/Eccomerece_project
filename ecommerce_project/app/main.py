@@ -3,7 +3,7 @@ from fastapi_mail import FastMail, MessageSchema
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 from app.database import get_db, Base , engine
-from app.models import User
+from app.models import User,ProductVariant
 from app.schemas import UserCreate, UserLogin,ResetPasswordRequest
 from app.utils import hash_password, verify_password , pwd_context, create_reset_token, verify_reset_token
 from app.auth import create_access_token
@@ -24,7 +24,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")  # Or your login endpoint
 from app.routers.admin import router as admin_router
 from app.routers.categoryroute import router as category_router
 from app.routers.productroute import router as product_router
-from app.routers.cart import router as cart_router
+# from app.routers.cart import router as cart_router
 from app.routers.webhook import router as webhook_router
 from app.routers.payment import router as payment_router
 from app.routers.orders import router as order_router
@@ -36,6 +36,18 @@ app=FastAPI()
 
 Base.metadata.create_all(bind=engine)
 
+origins = [
+    "http://localhost:3000",
+    "https://ecommerce.com",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 #register & login start
 @app.post("/register/")
@@ -141,7 +153,7 @@ app.include_router(admin_router)
 app.include_router(product_router)
 app.include_router(category_router)
 app.include_router(review_router)
-app.include_router(cart_router)
+# app.include_router(cart_router)
 app.include_router(order_router)
 app.include_router(shippingdetails_router)
 app.include_router(webhook_router)
