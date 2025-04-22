@@ -10,10 +10,20 @@ from uuid import uuid4
 import os, uuid, json
 
 router=APIRouter(prefix="/product", tags=["Product panel"])
+#Product Management
+# @router.get("/products", response_model=List[ProductResponse])
+# def get_product(category_id:Optional[int]=None,db: Session=Depends(get_db)):
+#     if category_id:
+#         products=db.query(Product).filter(Product.category_id==category_id).all()
+#     else:
+#         products=db.query(Product).all()
+#     if not products:
+#         raise HTTPException(status_code=404, detail="No products found.")
+#     return products
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/products", response_model=ProductResponse)
+@router.post("/", response_model=ProductResponse)
 async def add_product(
     product_name: str = Form(...),
     brand: str = Form(...),
@@ -167,7 +177,7 @@ async def add_product(
 
 
 
-@router.get("/products", response_model=List[ProductResponse])
+@router.get("/", response_model=List[ProductResponse])
 def get_products(
     db: Session = Depends(get_db),
     category_id: Optional[int] = None
@@ -194,105 +204,21 @@ def get_products(
         product_responses.append(ProductResponse(**product_dict, images=image_urls))
 
     return product_responses
-# GET product by ID
-from fastapi import Path
-from typing_extensions import Annotated
+
+
 @router.get("/products/{product_id}", response_model=ProductResponse)
-def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
+def get_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    variants = db.query(ProductVariant).filter_by(product_id=product.id).all()
-    variant_list = []
-    for variant in variants:
-        images = db.query(ProductImage).filter_by(variant_id=variant.id).all()
-        image_urls = [img.image_url for img in images]
-        variant_list.append({
-            "id": variant.id,
-            "price": variant.price,
-            "stock": variant.stock,
-            "discount": variant.discount,
-            "shipping_time": variant.shipping_time,
-            "attributes": variant.attributes,
-            "created_at": variant.created_at,
-            "updated_at": variant.updated_at,
-            "images": image_urls
-        })
+    image_urls = [img.image_url for img in product.images]  # Extract image URLs
+    product_dict = product.__dict__.copy()  # Copy dictionary
+    product_dict.pop("images", None)  # Remove 'images' key
 
-    return ProductResponse(
-        id=product.id,
-        sku=product.sku,
-        product_name=product.product_name,
-        brand=product.brand,
-        category_id=product.category_id,
-        description=product.description,
-        admin_id=product.admin_id,
-        created_at=product.created_at,
-        updated_at=product.updated_at,
-        variants=variant_list,
-        images=[]
-    )
-#get product by category
-@router.get("/products/category/{category_id}", response_model=List[ProductResponse])
-def get_products_by_category(category_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
-    category = db.query(Category).filter(Category.id == category_id).first()
-    if not category:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Category with ID {category_id} does not exist."
-        )
-    products = db.query(Product).filter(Product.category_id == category_id).all()
-    response = []
-    for product in products:
-        variants = db.query(ProductVariant).filter_by(product_id=product.id).all()
-        variant_list = []
-        for variant in variants:
-            images = db.query(ProductImage).filter_by(variant_id=variant.id).all()
-            image_urls = [img.image_url for img in images]
-            variant_list.append({
-                "id": variant.id,
-                "price": variant.price,
-                "stock": variant.stock,
-                "discount": variant.discount,
-                "shipping_time": variant.shipping_time,
-                "attributes": variant.attributes,
-                "created_at": variant.created_at,
-                "updated_at": variant.updated_at,
-                "images": image_urls
-            })
+    return ProductResponse(**product_dict, images=image_urls)
 
-        response.append(ProductResponse(
-            id=product.id,
-            sku=product.sku,
-            product_name=product.product_name,
-            brand=product.brand,
-            category_id=product.category_id,
-            description=product.description,
-            admin_id=product.admin_id,
-            created_at=product.created_at,
-            updated_at=product.updated_at,
-            variants=variant_list,
-            images=[]
-        ))
-
-    return response
-
-
-@router.delete("/products/{product_id}")
-def delete_product(product_id: int, db: Session = Depends(get_db), admin: dict = Depends(admin_required)):
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    # Step 1: Delete related reviews
-    db.query(Review).filter_by(product_id=product_id).delete(synchronize_session=False)
-    db.query(ProductImage).filter(ProductImage.variant_id.in_(
-        db.query(ProductVariant.id).filter_by(product_id=product_id))).delete(synchronize_session=False)
-    db.query(ProductVariant).filter_by(product_id=product_id).delete()
-    db.delete(product)
-    db.commit()
-    return {"detail": "Product deleted successfully"}
-
+#update the product
 @router.put("/products/{product_id}", response_model=ProductResponse)
 async def update_product(
     product_id: int,

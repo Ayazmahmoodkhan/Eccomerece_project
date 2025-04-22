@@ -90,7 +90,6 @@ async def create_checkout_session(payment_data: PaymentIntentRequest, db: Sessio
             db.commit()
             db.refresh(payment)
 
-            # 4. Log the Cash on Delivery order creation in the PaymentLog table
             log = PaymentLog(
                 payment_id=payment.id,
                 status="cash_on_delivery_created",

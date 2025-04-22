@@ -29,11 +29,26 @@ from app.routers.webhook import router as webhook_router
 from app.routers.payment import router as payment_router
 from app.routers.orders import router as order_router
 from app.routers.reviews import router as review_router
+from app.routers.user_profile import router as userprofile_router
 from app.routers.shipping_details import router as shippingdetails_router
+from app.rate_limiter import setup_rate_limiting
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app=FastAPI()
 
+# app.mount("/media", StaticFiles(directory="media"), name="media")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"],  
+)
+
+setup_rate_limiting(app)
 Base.metadata.create_all(bind=engine)
 
 origins = [
@@ -79,7 +94,7 @@ def register(user:UserCreate,background_tasks:BackgroundTasks,db:Session=Depends
 @app.post("/login/")
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(
-        (User.username == user.login) | (User.email == user.login)
+        (User.username == user.username) | (User.email == user.username)
     ).first()
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(
@@ -89,7 +104,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Your account is inactive"
         )
-    # Updated function call (only user_id is passed)
+    
     access_token = create_access_token(db_user.id)
 
     return {"access_token": access_token, "token_type": "bearer"}
@@ -97,7 +112,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 #register & login end
 
 #forgot password reset start
-FRONTEND_BASE_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5500")
+FRONTEND_BASE_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5173")
 from app.send_email import conf
 @app.post("/forgot-password/")
 async def forgot_password(email: EmailStr, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -106,7 +121,7 @@ async def forgot_password(email: EmailStr, background_tasks: BackgroundTasks, db
     if not user:
         raise HTTPException(status_code=404, detail="Email not found")
     reset_token = create_reset_token(user.id)
-    reset_link = f"http://192.168.1.49:8000/reset-password?token={reset_token}"
+    reset_link = f"http://192.168.1.85:8000/reset-password?token={reset_token}"
     email_body = f"""
     <html>
     <body>
@@ -130,7 +145,7 @@ async def validate_token(token: str):
     """Token validate karega aur frontend pe redirect karega"""
     if not token:
         raise HTTPException(status_code=400, detail="Token is required")
-    frontend_url = f"{FRONTEND_BASE_URL}/reset-password.html?token={token}"
+    frontend_url = f"{"http://localhost:5173"}/reset-password?token={token}"
     return RedirectResponse(url=frontend_url)
 @app.post("/reset-password/")
 async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
@@ -149,6 +164,7 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
 # Routers  
 
 app.include_router(profile_address.router, prefix="/user", tags=["User Profile & Address"])
+app.include_router(userprofile_router)
 app.include_router(admin_router)
 app.include_router(product_router)
 app.include_router(category_router)
