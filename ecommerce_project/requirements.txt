@@ -12,3 +12,4 @@ psycopg2-binary==2.9.10
 pyjwt==2.10.1
 python-multipart==0.0.20
 stripe==9.7.0
+slowapi==0.1.9

@@ -9,7 +9,7 @@ from typing import Optional, List
 from uuid import uuid4
 import os, uuid
 
-router=APIRouter(prefix="/product", tags=["Product panel"])
+router=APIRouter(prefix="/products", tags=["Product panel"])
 #Product Management
 # @router.get("/products", response_model=List[ProductResponse])
 # def get_product(category_id:Optional[int]=None,db: Session=Depends(get_db)):
@@ -23,7 +23,7 @@ router=APIRouter(prefix="/product", tags=["Product panel"])
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/products", response_model=ProductResponse)
+@router.post("/", response_model=ProductResponse)
 async def add_product(
     product_name: str = Form(...),
     price: float = Form(...),
@@ -107,7 +107,7 @@ async def add_product(
     )
 
 
-@router.get("/products", response_model=List[ProductResponse])
+@router.get("/", response_model=List[ProductResponse])
 def get_products(
     db: Session = Depends(get_db),
     category_id: Optional[int] = None
@@ -130,7 +130,7 @@ def get_products(
     return product_responses
 
 
-@router.get("/products/{product_id}", response_model=ProductResponse)
+@router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -143,7 +143,7 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
     return ProductResponse(**product_dict, images=image_urls)
 
 #update the product
-@router.put("/products/{product_id}", response_model=ProductResponse)
+@router.put("/{product_id}", response_model=ProductResponse)
 async def update_product(
     product_id: int,
     product_name: str = Form(None),

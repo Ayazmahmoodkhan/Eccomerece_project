@@ -27,7 +27,6 @@ def create_order_payload():
         ]
     }
 
-# Send 5 orders, one every 10 seconds
 for i in range(5):
     payload = create_order_payload()
     response = requests.post(URL, json=payload)
