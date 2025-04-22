@@ -6,8 +6,7 @@ import os
 import platform
 import ssl
 import sys
-from configparser import RawConfigParser
-from typing import IO, Any, Callable
+from typing import Any, Callable
 
 import click
 
@@ -48,7 +47,7 @@ def print_version(ctx: click.Context, param: click.Parameter, value: bool) -> No
     if not value or ctx.resilient_parsing:
         return
     click.echo(
-        "Running uvicorn {version} with {py_implementation} {py_version} on {system}".format(  # noqa: UP032
+        "Running uvicorn {version} with {py_implementation} {py_version} on {system}".format(
             version=uvicorn.__version__,
             py_implementation=platform.python_implementation(),
             py_version=platform.python_version(),
@@ -240,10 +239,8 @@ def print_version(ctx: click.Context, param: click.Parameter, value: bool) -> No
     "--forwarded-allow-ips",
     type=str,
     default=None,
-    help="Comma separated list of IP Addresses, IP Networks, or literals "
-    "(e.g. UNIX Socket path) to trust with proxy headers. Defaults to the "
-    "$FORWARDED_ALLOW_IPS environment variable if available, or '127.0.0.1'. "
-    "The literal '*' means trust everything.",
+    help="Comma separated list of IPs to trust with proxy headers. Defaults to"
+    " the $FORWARDED_ALLOW_IPS environment variable if available, or '127.0.0.1'.",
 )
 @click.option(
     "--root-path",
@@ -484,7 +481,7 @@ def run(
     reload_delay: float = 0.25,
     workers: int | None = None,
     env_file: str | os.PathLike[str] | None = None,
-    log_config: dict[str, Any] | str | RawConfigParser | IO[Any] | None = LOGGING_CONFIG,
+    log_config: dict[str, Any] | str | None = LOGGING_CONFIG,
     log_level: str | int | None = None,
     access_log: bool = True,
     proxy_headers: bool = True,
@@ -497,7 +494,7 @@ def run(
     limit_max_requests: int | None = None,
     timeout_keep_alive: int = 5,
     timeout_graceful_shutdown: int | None = None,
-    ssl_keyfile: str | os.PathLike[str] | None = None,
+    ssl_keyfile: str | None = None,
     ssl_certfile: str | os.PathLike[str] | None = None,
     ssl_keyfile_password: str | None = None,
     ssl_version: int = SSL_PROTOCOL_VERSION,
@@ -568,20 +565,16 @@ def run(
         logger.warning("You must pass the application as an import string to enable 'reload' or " "'workers'.")
         sys.exit(1)
 
-    try:
-        if config.should_reload:
-            sock = config.bind_socket()
-            ChangeReload(config, target=server.run, sockets=[sock]).run()
-        elif config.workers > 1:
-            sock = config.bind_socket()
-            Multiprocess(config, target=server.run, sockets=[sock]).run()
-        else:
-            server.run()
-    except KeyboardInterrupt:
-        pass  # pragma: full coverage
-    finally:
-        if config.uds and os.path.exists(config.uds):
-            os.remove(config.uds)  # pragma: py-win32
+    if config.should_reload:
+        sock = config.bind_socket()
+        ChangeReload(config, target=server.run, sockets=[sock]).run()
+    elif config.workers > 1:
+        sock = config.bind_socket()
+        Multiprocess(config, target=server.run, sockets=[sock]).run()
+    else:
+        server.run()
+    if config.uds and os.path.exists(config.uds):
+        os.remove(config.uds)  # pragma: py-win32
 
     if not server.started and not config.should_reload and config.workers == 1:
         sys.exit(STARTUP_FAILURE)
