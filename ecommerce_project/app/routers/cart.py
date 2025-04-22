@@ -1,99 +1,124 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
-from app.database import get_db
-from app.models import Cart, CartItem, Product, User
-from app.schemas import CartCreate, CartResponse, CartUpdate
-from app.auth import get_current_user  # Make sure this function returns current logged-in user
+# from fastapi import APIRouter, Depends, HTTPException, status
+# from sqlalchemy.orm import Session
+# from typing import List
+# from app.database import get_db
+# from app.models import Cart, CartItem, Product, User
+# from app.schemas import CartCreate, CartResponse, CartUpdate
+# from app.auth import get_current_user 
 
-router = APIRouter(prefix="/carts", tags=["Carts"])
+# router = APIRouter(prefix="/carts", tags=["Carts"])
 
-# Create Cart for Authenticated User
-@router.post("/", response_model=CartResponse, status_code=status.HTTP_201_CREATED)
-def create_cart(
-    cart_data: CartCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    grand_total = sum(item.subtotal for item in cart_data.cart_items)
+# # Create Cart 
+# @router.post("/", response_model=CartResponse, status_code=status.HTTP_201_CREATED)
+# def create_cart(
+#     cart_data: CartCreate,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     total_amount = 0.0
+#     cart_items = []
 
-    cart = Cart(
-        user_id=current_user.id,
-        total_amount=cart_data.total_amount,
-        grand_total=grand_total
-    )
-    db.add(cart)
-    db.commit()
-    db.refresh(cart)
+#     for item in cart_data.cart_items:
+#         product = db.query(Product).filter(Product.id == item.product_id).first()
+#         if not product:
+#             raise HTTPException(status_code=404, detail=f"Product ID {item.product_id} not found.")
 
-    for item in cart_data.cart_items:
-        product = db.query(Product).filter(Product.id == item.product_id).first()
-        if not product:
-            raise HTTPException(status_code=404, detail=f"Product ID {item.product_id} not found.")
+#         subtotal = product.price * item.quantity
+#         total_amount += subtotal
 
-        cart_item = CartItem(
-            cart_id=cart.id,
-            product_id=item.product_id,
-            quantity=item.quantity,
-            subtotal=item.subtotal
-        )
-        db.add(cart_item)
+#         cart_items.append({
+#             "product_id": item.product_id,
+#             "quantity": item.quantity,
+#             "subtotal": subtotal
+#         })
 
-    db.commit()
-    db.refresh(cart)
-    return cart
+#     cart = Cart(
+#         user_id=current_user.id,
+#         total_amount=total_amount,
+#         grand_total=total_amount
+#     )
+#     db.add(cart)
+#     db.commit()
+#     db.refresh(cart)
 
-# Get Cart (Only if it belongs to the current user)
-@router.get("/{cart_id}", response_model=CartResponse)
-def get_cart(cart_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    cart = db.query(Cart).filter(Cart.id == cart_id, Cart.user_id == current_user.id).first()
-    if not cart:
-        raise HTTPException(status_code=404, detail="Cart not found or access denied.")
-    return cart
+#     for item in cart_items:
+#         cart_item = CartItem(
+#             cart_id=cart.id,
+#             product_id=item["product_id"],
+#             quantity=item["quantity"],
+#             subtotal=item["subtotal"]
+#         )
+#         db.add(cart_item)
 
-# Update Cart (Only if it belongs to the current user)
-@router.put("/{cart_id}", response_model=CartResponse)
-def update_cart(cart_id: int, cart_data: CartUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    cart = db.query(Cart).filter(Cart.id == cart_id, Cart.user_id == current_user.id).first()
-    if not cart:
-        raise HTTPException(status_code=404, detail="Cart not found or access denied.")
+#     db.commit()
+#     db.refresh(cart)
+#     return cart
 
-    cart.total_amount = cart_data.total_amount
 
-    if cart_data.cart_items:
-        db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
+# # Get Cart 
+# @router.get("/{cart_id}", response_model=CartResponse)
+# def get_cart(
+#     cart_id: int,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     cart = db.query(Cart).filter(Cart.id == cart_id, Cart.user_id == current_user.id).first()
+#     if not cart:
+#         raise HTTPException(status_code=404, detail="Cart not found or access denied.")
+#     return cart
 
-        for item in cart_data.cart_items:
-            product = db.query(Product).filter(Product.id == item.product_id).first()
-            if not product:
-                raise HTTPException(status_code=404, detail=f"Product ID {item.product_id} not found.")
+# # update cart
+# @router.put("/{cart_id}", response_model=CartResponse)
+# def update_cart(
+#     cart_id: int,
+#     cart_data: CartUpdate,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     cart = db.query(Cart).filter(Cart.id == cart_id, Cart.user_id == current_user.id).first()
+#     if not cart:
+#         raise HTTPException(status_code=404, detail="Cart not found or access denied.")
 
-            cart_item = CartItem(
-                cart_id=cart.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                subtotal=item.subtotal
-            )
-            db.add(cart_item)
+#     total_amount = 0.0
 
-    db.commit()
-    db.refresh(cart)
+#     if cart_data.cart_items:
+#         db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
 
-    grand_total = sum(item.subtotal for item in cart_data.cart_items) if cart_data.cart_items else cart.grand_total
-    cart.grand_total = grand_total
+#         for item in cart_data.cart_items:
+#             product = db.query(Product).filter(Product.id == item.product_id).first()
+#             if not product:
+#                 raise HTTPException(status_code=404, detail=f"Product ID {item.product_id} not found.")
 
-    db.commit()
-    db.refresh(cart)
-    return cart
+#             subtotal = product.price * item.quantity
+#             total_amount += subtotal
 
-# Delete Cart (Only if it belongs to the current user)
-@router.delete("/{cart_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_cart(cart_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    cart = db.query(Cart).filter(Cart.id == cart_id, Cart.user_id == current_user.id).first()
-    if not cart:
-        raise HTTPException(status_code=404, detail="Cart not found or access denied.")
+#             cart_item = CartItem(
+#                 cart_id=cart.id,
+#                 product_id=item.product_id,
+#                 quantity=item.quantity,
+#                 subtotal=subtotal
+#             )
+#             db.add(cart_item)
 
-    db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
-    db.delete(cart)
-    db.commit()
-    return {"detail": "Cart deleted successfully"}
+#     cart.total_amount = total_amount
+#     cart.grand_total = total_amount
+
+#     db.commit()
+#     db.refresh(cart)
+#     return cart
+
+# # cart delete
+# @router.delete("/{cart_id}", status_code=status.HTTP_204_NO_CONTENT)
+# def delete_cart(
+#     cart_id: int,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     cart = db.query(Cart).filter(Cart.id == cart_id, Cart.user_id == current_user.id).first()
+#     if not cart:
+#         raise HTTPException(status_code=404, detail="Cart not found or access denied.")
+
+#     db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
+#     db.delete(cart)
+#     db.commit()
+#     return {"detail": "Cart deleted successfully"}

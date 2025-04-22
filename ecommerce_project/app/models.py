@@ -59,6 +59,7 @@ class UserProfile(Base):
     date_birth = Column(Date, nullable=False)
     phone = Column(String, nullable=False)
     age = Column(Integer, nullable=False)
+    profile_picture = Column(String, nullable=True)
 
     user = relationship("User", back_populates="profile")
 
