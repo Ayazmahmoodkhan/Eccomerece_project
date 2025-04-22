@@ -20,6 +20,10 @@ def get_categories(db: Session = Depends(get_db)):
 def create_category(category: CategoryCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can create categories.")
+    existing = db.query(Category).filter(Category.name == category.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Category with this name already exists.")
+
 
     new_category = Category(**category.dict())
     db.add(new_category)
@@ -36,6 +40,10 @@ def update_category(category_id: int, category_update: CategoryUpdate, db: Sessi
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found.")
+    existing = db.query(Category).filter(Category.name == category.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Category with this name already exists.")
+
 
     for key, value in category_update.dict(exclude_unset=True).items():
         setattr(category, key, value)

@@ -1,7 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field,HttpUrl, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator,condecimal, conint
 from datetime import date,datetime
 from enum import Enum
-from typing import Optional, List, Any, Literal
+from typing import Optional, List, Any, Literal,Dict
 from app.models import RatingEnum
 
 
@@ -77,69 +77,118 @@ class CategoryResponse(CategoryBase):
 
     class Config:
         from_attributes = True
-# Product Schema
+
+# #class ProductVariantBase start
+# class ProductVariantBase(BaseModel):
+#     color: str
+#     price: float
+#     stock: int
+#     dicount:int
+#     shipping_time: Optional[int] = None
+
+# class ProductVariantCreate(ProductVariantBase):
+#     pass
+
+
+# class ProductVariantResponse(ProductVariantBase):
+#     id: int
+#     created_at: Optional[datetime]
+#     updated_at: Optional[datetime]
+
+#     model_config = {
+#         "from_attributes": True
+#     }
+
+
 # class ProductBase(BaseModel):
 #     product_name: str
-#     price: float
-#     discount: float
-#     stock: int
 #     brand: str
 #     category_id: int
 #     description: str
-#     color: str
-#     shipping_time: str
+
+#     @field_validator("product_name", "brand", "description", mode="before")
+#     @classmethod
+#     def remove_extra_quotes(cls, value):
+#         return value.strip('"') if isinstance(value, str) else value
+
 
 # class ProductCreate(ProductBase):
-#     images: List[str]  # Image URLs as a list of strings
+#     images: List[str]  # or List[UploadFile] if you're working with FastAPI forms
+#     variants: List[ProductVariantCreate]
+
 
 # class ProductResponse(ProductBase):
 #     id: int
 #     sku: str
 #     admin_id: int
+#     created_at: Optional[datetime]
+#     updated_at: Optional[datetime]
 #     images: List[str]
+#     variants: List[ProductVariantResponse] = []
 
-#     class Config:
-#         from_attributes = True
+#     model_config = {
+#         "from_attributes": True
+#     }
+# #class ProductVariantBase end
+from decimal import Decimal
+from typing_extensions import Annotated
+class ProductVariantBase(BaseModel):
+    price: Annotated[Decimal, Field(gt=0)]  # price should be greater than 0
+    stock: Annotated[int, Field(ge=0)]  # stock should be a non-negative integer
+    discount: Optional[Annotated[int, Field(ge=0, le=100)]] = 0  # discount between 0 and 100
+    shipping_time: Optional[Annotated[int, Field(ge=0)]] = None  # shipping_time should be a non-negative integer
+    attributes: Dict[str, str]
+
+
+class ProductVariantCreate(ProductVariantBase):
+    images: List[str]  # or List[UploadFile] if handling in FastAPI form
+
+class ProductVariantResponse(ProductVariantBase):
+    id: int
+    images: List[str]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+
+    class Config:
+        orm_mode = True
+
+
+# ---------------- Product ----------------
 
 class ProductBase(BaseModel):
     product_name: str
-    price: float
-    discount: float
-    stock: int
     brand: str
     category_id: int
     description: str
-    color: str
-    shipping_time: str
 
-class ProductCreate(ProductBase):
-    images: List[str]  
-
-class ProductResponse(ProductBase):
-    id: int
-    sku: str
-    images: List[str]  
-
-    @field_validator(
-        "product_name", "brand", "description", "color", "shipping_time", mode="before"
-    )
+    @field_validator("product_name", "brand", "description", mode="before")
     @classmethod
     def remove_extra_quotes(cls, value):
         return value.strip('"') if isinstance(value, str) else value
 
+class ProductCreate(ProductBase):
+    variants: List[ProductVariantCreate]
+
+class ProductResponse(ProductBase):
+    id: int
+    sku: str
+    admin_id: int
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    variants: List[ProductVariantResponse] = []
+
     class Config:
         from_attributes = True
 
+# Cart Item Schema
 
+class CartItemBase(BaseModel):
+    product_id: int
+    quantity: int
+    subtotal: float
 
-# #  Cart Item Schemas 
-
-# class CartItemBase(BaseModel):
-#     product_id: int
-#     quantity: int
-
-# class CartItemCreate(CartItemBase):
-#     pass
+class CartItemCreate(CartItemBase):
+    pass
 
 # class CartItemResponse(CartItemBase):
 #     id: int
