@@ -11,16 +11,10 @@ from app.send_email import send_email_background
 import os
 from fastapi.responses import RedirectResponse
 from app.routers import profile_address
-
 from fastapi.security import OAuth2PasswordBearer
-from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")  # Or your login endpoint
-
-
-
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 from app.routers.admin import router as admin_router
 from app.routers.categoryroute import router as category_router
 from app.routers.productroute import router as product_router
@@ -29,7 +23,6 @@ from app.routers.webhook import router as webhook_router
 from app.routers.payment import router as payment_router
 from app.routers.orders import router as order_router
 from app.routers.reviews import router as review_router
-from app.routers.user_profile import router as userprofile_router
 from app.routers.shipping_details import router as shippingdetails_router
 from app.rate_limiter import setup_rate_limiting
 from fastapi.staticfiles import StaticFiles
@@ -38,7 +31,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app=FastAPI()
 
-# app.mount("/media", StaticFiles(directory="media"), name="media")
+app.mount("/media", StaticFiles(directory="media"), name="media")
+
+# {
+#   "image_url": "http://localhost:8000/media/profiles/user_1.jpg"
+# }
+# They display it like:
+
+# <img src="http://localhost:8000/media/profiles/user_1.jpg" />
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,19 +50,6 @@ app.add_middleware(
 
 setup_rate_limiting(app)
 Base.metadata.create_all(bind=engine)
-
-origins = [
-    "http://localhost:3000",
-    "https://ecommerce.com",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 #register & login start
 @app.post("/register/")
@@ -156,7 +143,8 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user.password = hash_password(data.new_password)
+    user.hashed_password = hash_password(data.new_password)
+    db.add(user)
     db.commit()
     return {"message": "Password updated successfully"}
 #forgot password reset end
@@ -164,7 +152,6 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
 # Routers  
 
 app.include_router(profile_address.router, prefix="/user", tags=["User Profile & Address"])
-app.include_router(userprofile_router)
 app.include_router(admin_router)
 app.include_router(product_router)
 app.include_router(category_router)

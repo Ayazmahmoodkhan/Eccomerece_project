@@ -136,22 +136,17 @@ class ProductVariantBase(BaseModel):
     price: Annotated[Decimal, Field(gt=0)]  # price should be greater than 0
     stock: Annotated[int, Field(ge=0)]  # stock should be a non-negative integer
     discount: Optional[Annotated[int, Field(ge=0, le=100)]] = 0  # discount between 0 and 100
-    shipping_time: Optional[Annotated[int, Field(ge=0)]] = None  # shipping_time should be a non-negative integer
+    shipping_time: Optional[Annotated[int, Field(ge=0)]] = None  
     attributes: Dict[str, str]
 
-
 class ProductVariantCreate(ProductVariantBase):
-    images: List[str]  # or List[UploadFile] if handling in FastAPI form
+    images: List[str]  
 
 class ProductVariantResponse(ProductVariantBase):
     id: int
     images: List[str]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
 
-    class Config:
-        orm_mode = True
-
+    model_config = {"from_attributes": True}
 
 # ---------------- Product ----------------
 
@@ -177,8 +172,8 @@ class ProductResponse(ProductBase):
     updated_at: Optional[datetime]
     variants: List[ProductVariantResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
 
 # Cart Item Schema
 
@@ -298,7 +293,7 @@ class ReviewCreate(BaseModel):
     description: str
 
 class ReviewResponse(BaseModel):
-    review_id: int
+    id: int
     product_id: int
     user_id: int
     rating: int
