@@ -14,8 +14,13 @@ def create_review(
     review: schemas.ReviewCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
-    # Check if the user has already reviewed the product
+):  
+    if review.rating < 1 or review.rating > 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Rating must be between 1 and 5"
+        )
+    
     existing_review = db.query(models.Review).filter(
         models.Review.user_id == current_user.id,
         models.Review.product_id == review.product_id
@@ -37,6 +42,7 @@ def create_review(
     db.commit()
     db.refresh(new_review)
     return new_review
+
 
 # Get all reviews
 @router.get("/", response_model=List[schemas.ReviewResponse])
