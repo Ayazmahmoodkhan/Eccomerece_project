@@ -89,7 +89,7 @@ class VariantAttribute(Base):
     __tablename__ = "variant_attributes"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, nullable=False)  # e.g., size, color, ram
+    name = Column(String, unique=True, nullable=False) 
 
     categories = relationship("CategoryVariantAttribute", back_populates="attribute")
 class CategoryVariantAttribute(Base):
@@ -126,7 +126,7 @@ class Product(Base):
     order_items = relationship("OrderItem", back_populates="product")
 
    
-# New: PorductImage Table
+# PorductImage Table
 class ProductImage(Base):
     __tablename__ = "product_images"
 
@@ -259,17 +259,21 @@ class OrderItem(Base):
 
 
 # Review Table
+
 class Review(Base):
     __tablename__ = "reviews"
-    review_id = Column(Integer, primary_key=True, index=True)
-    description = Column(String, nullable=False)
-    rating = Column(Enum(RatingEnum), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at  = Column(DateTime(timezone= True), server_default=func.now())
 
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    rating = Column(Integer)
+    description = Column(String)
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationships
     product = relationship("Product", back_populates="reviews")
     user = relationship("User", back_populates="reviews")
+
 
 # Payment Table
 # class Payment(Base):

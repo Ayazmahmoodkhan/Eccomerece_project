@@ -18,18 +18,19 @@ def get_categories(db: Session = Depends(get_db)):
 # Admin: Create a new category
 @router.post("/categories", response_model=CategoryResponse)
 def create_category(category: CategoryCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+ 
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can create categories.")
     existing = db.query(Category).filter(Category.category_name == category.category_name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Category with this name already exists.")
 
-
     new_category = Category(**category.dict())
     db.add(new_category)
     db.commit()
     db.refresh(new_category)
     return new_category
+
 
 # Admin: Update category
 @router.put("/categories/{category_id}", response_model=CategoryResponse)

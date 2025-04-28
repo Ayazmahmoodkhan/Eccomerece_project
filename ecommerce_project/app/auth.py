@@ -16,8 +16,8 @@ def create_access_token(user_id: int):
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRES_MINUTES)
     payload = {
         "user_id": user_id,
-        "exp": expire,  # Expiry time
-        "sub": str(user_id)  # Subject field (optional)
+        "exp": expire, 
+        "sub": str(user_id) 
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
