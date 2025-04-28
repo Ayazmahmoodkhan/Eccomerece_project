@@ -13,7 +13,7 @@ class UserCreate(BaseModel):
     confirm_password: str = Field(..., min_length=6, max_length=20)
 
 class UserLogin(BaseModel):
-    login:str
+    username:str
     password:str
 
 class UserResponse(BaseModel):
@@ -54,10 +54,10 @@ class UserProfileBase(BaseModel):
     phone: str
     age: int
 class UserProfileCreate(UserProfileBase):
-    pass  # Naya profile create karne ke liye
+    pass  
 
 class UserProfileUpdate(UserProfileBase):
-    pass  # Existing profile update karne ke liye
+    pass  
 
 class UserProfileResponse(UserProfileBase):
     id: int
@@ -70,7 +70,7 @@ class UserProfileResponse(UserProfileBase):
 
 
 
-# Category Base schema (Common fields)
+# Category Base schema 
 class CategoryBase(BaseModel):
     category_name: str
     description: Optional[str] = None
@@ -185,6 +185,8 @@ class ProductResponse(ProductBase):
     variants: List[ProductVariantResponse] = []
 
     model_config = {"from_attributes": True}
+
+
 # Cart Item Schema
 
 class CartItemBase(BaseModel):
@@ -195,28 +197,29 @@ class CartItemBase(BaseModel):
 class CartItemCreate(CartItemBase):
     pass
 
-class CartItemResponse(CartItemBase):
-    id: int
+# class CartItemResponse(CartItemBase):
+#     id: int
+#     subtotal: float 
 
-    class Config:
-        from_attributes = True
+#     class Config:
+#         from_attributes = True
 
-# Cart Schema
 
-class CartBase(BaseModel):
-    user_id: int
-    total_amount: float
+# #  Cart Schemas
 
-class CartCreate(CartBase):
-    cart_items: List[CartItemCreate]
+# class CartCreate(BaseModel):
+#     cart_items: List[CartItemCreate]
 
-class CartUpdate(CartBase):
-    cart_items: Optional[List[CartItemCreate]] = None
+# class CartUpdate(BaseModel):
+#     cart_items: Optional[List[CartItemCreate]] = None
 
-class CartResponse(CartBase):
-    id: int
-    created_at: datetime
-    cart_items: List[CartItemResponse]
+# class CartResponse(BaseModel):
+#     id: int
+#     total_amount: float 
+#     grand_total: float  
+#     created_at: datetime
+#     cart_items: List[CartItemResponse]
+
 
     class Config:
         from_attributes = True
@@ -227,7 +230,10 @@ class ProductImageResponse(BaseModel):
     class Config:
         orm_mode = True
 
-# Order Schema Enum
+
+
+
+# Order Enum
 
 class OrderStatus(str, Enum):
     pending = "pending"
@@ -327,9 +333,11 @@ class OrderStatus(str, Enum):
 
 # -------- OrderItem Schemas --------
 class OrderItemBase(BaseModel):
+
     product_id: int
     variant_id: int
     quantity: int
+
 
 class OrderItemCreate(OrderItemBase):
     pass
@@ -375,6 +383,7 @@ class OrderResponse(OrderBase):
 
     class Config:
         orm_mode = True
+
 class OrderUpdate(BaseModel):
     order_status: Optional[OrderStatus] = None
     cancel_reason: Optional[str] = None
@@ -395,6 +404,7 @@ class OrderCancelResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
 
 
 class CouponBase(BaseModel):
@@ -418,19 +428,20 @@ class ApplyCouponRequest(BaseModel):
     coupon_code: str
 #end new schemas
 
+
 # reviews schema
-class ReviewBase(BaseModel):
-    description: str
-    rating: RatingEnum 
-
-class ReviewCreate(ReviewBase):
+class ReviewCreate(BaseModel):
     product_id: int
-    user_id: int
+    rating: int
+    description: str
 
-class ReviewResponse(ReviewBase):
+class ReviewResponse(BaseModel):
     review_id: int
     product_id: int
     user_id: int
+    rating: int
+    description: str
+    created_at: datetime
 
     class Config:
         orm_mode = True

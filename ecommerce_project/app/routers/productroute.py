@@ -10,6 +10,16 @@ from uuid import uuid4
 import os, uuid, json
 
 router=APIRouter(prefix="/product", tags=["Product panel"])
+#Product Management
+# @router.get("/products", response_model=List[ProductResponse])
+# def get_product(category_id:Optional[int]=None,db: Session=Depends(get_db)):
+#     if category_id:
+#         products=db.query(Product).filter(Product.category_id==category_id).all()
+#     else:
+#         products=db.query(Product).all()
+#     if not products:
+#         raise HTTPException(status_code=404, detail="No products found.")
+#     return products
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -184,11 +194,11 @@ async def add_product(
         images=[]
     )
 
+
 #get all products
 @router.get("/allproducts", response_model=List[ProductResponse])
 def get_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
-
     product_responses = []
     for product in products:
         variants = []
@@ -228,6 +238,7 @@ def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(ge
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
 
     variants = db.query(ProductVariant).filter_by(product_id=product.id).all()
     variant_list = []
@@ -316,6 +327,8 @@ def delete_product(product_id: int, db: Session = Depends(get_db), admin: dict =
     db.commit()
     return {"detail": "Product deleted successfully"}
 
+
+#update the product
 @router.put("/products/{product_id}", response_model=ProductResponse)
 async def update_product(
     product_id: int,
