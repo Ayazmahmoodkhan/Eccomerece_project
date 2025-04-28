@@ -2,11 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile,
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Float
 from app.models import User, Product, ProductImage, Category,ProductVariant,VariantAttribute,CategoryVariantAttribute,Review
-<<<<<<< HEAD
 from app.schemas import  ProductCreate,ProductResponse, ProductVariantResponse, ProductVariantCreate
-=======
-from app.schemas import  ProductCreate,ProductResponse, ProductVariantCreate,ProductVariantResponse
->>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
 from app.database import get_db
 from app.auth import get_current_user
 from app.routers.admin import admin_required
@@ -156,26 +152,16 @@ async def add_product(
                 raise HTTPException(status_code=400, detail=f"Not enough images provided for variant at index {idx}")
 
             image = variant_images[image_index]
-<<<<<<< HEAD
             short_id = uuid.uuid4().hex[:8]  # 8 characters only
             clean_filename = image.filename.replace(" ", "_").lower()
             filename = f"{short_id}_{clean_filename}"
-=======
-            safe_filename = image.filename.replace(" ", "_")
-            filename = f"{uuid.uuid4()}_{safe_filename}"
->>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
             file_path = os.path.join(UPLOAD_DIR, filename)
 
             # Save image
             with open(file_path, "wb") as buffer:
                 buffer.write(await image.read())
-            BASE_URL = "http://localhost:8000"  
-            image_url = f"{BASE_URL}/static/uploads/{filename}"
 
-<<<<<<< HEAD
-=======
             image_url = f"/media/uploads/{filename}"
->>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
             db.add(ProductImage(variant_id=new_variant.id, image_url=image_url))
             variant_image_urls.append(image_url)
             image_index += 1
@@ -209,19 +195,10 @@ async def add_product(
     )
 
 
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
 #get all products
 @router.get("/allproducts", response_model=List[ProductResponse])
 def get_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
-<<<<<<< HEAD
-=======
-
->>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
     product_responses = []
     for product in products:
         variants = []
@@ -232,11 +209,7 @@ def get_products(db: Session = Depends(get_db)):
                 "stock": variant.stock,
                 "discount": variant.discount,
                 "shipping_time": variant.shipping_time,
-<<<<<<< HEAD
                 "attributes": variant.attributes or {},  # fallback to empty dict if None
-=======
-                "attributes": variant.attributes or {}, # fallback to empty dict if None
->>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
                 "images": [img.image_url for img in variant.images],
             }
             variants.append(ProductVariantResponse(**variant_dict))
@@ -262,14 +235,16 @@ from fastapi import Path
 from typing_extensions import Annotated
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
+# GET product by ID
+from fastapi import Path
+from typing_extensions import Annotated
+@router.get("/{product_id}", response_model=ProductResponse)
+def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
     variants = db.query(ProductVariant).filter_by(product_id=product.id).all()
     variant_list = []
     for variant in variants:
@@ -284,7 +259,6 @@ def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(ge
             "attributes": variant.attributes,
             "images": image_urls
         })
-<<<<<<< HEAD
 
     return ProductResponse(
         id=product.id,
@@ -461,10 +435,6 @@ async def update_product(
                 "attributes": new_variant.attributes,
                 "images": image_urls
             })
-
-    db.commit()
-=======
->>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
 
     return ProductResponse(
         id=product.id,
