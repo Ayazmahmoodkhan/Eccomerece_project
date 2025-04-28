@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile, File
 from sqlalchemy.orm import Session
 from app.models import User, Product, ProductImage, Category,ProductVariant,VariantAttribute,CategoryVariantAttribute,Review
-from app.schemas import  ProductCreate,ProductResponse, ProductVariantCreate
+from app.schemas import  ProductCreate,ProductResponse, ProductVariantResponse, ProductVariantCreate
 from app.database import get_db
 from app.auth import get_current_user
 from app.routers.admin import admin_required
@@ -13,7 +13,7 @@ router=APIRouter(prefix="/product", tags=["Product panel"])
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/products", response_model=ProductResponse)
+@router.post("/", response_model=ProductResponse)
 async def add_product(
     product_name: str = Form(...),
     brand: str = Form(...),
@@ -94,6 +94,13 @@ async def add_product(
 
         if not isinstance(attributes, dict):
             raise HTTPException(status_code=400, detail=f"'attributes' must be a dictionary in variant at index {idx}")
+        
+        if "color" not in attributes:
+            raise HTTPException(status_code=400, detail=f"Missing 'color' attribute in variant at index {idx}")
+
+        # ----- Check if color is a valid string (if it exists) -----
+        if "color" in attributes and (not isinstance(attributes["color"], str) or not attributes["color"]):
+            raise HTTPException(status_code=400, detail=f"Invalid 'color' attribute in variant at index {idx}")
 
         if not isinstance(image_count, int) or image_count < 1:
             raise HTTPException(status_code=400, detail=f"Invalid 'image_count' in variant at index {idx}")
@@ -117,19 +124,34 @@ async def add_product(
 
         # ----- Save Images -----
         variant_image_urls = []
+                # ---- Added this validation to check if the number of images provided matches image_count ----
+        if len(variant_images) < image_count:
+            raise HTTPException(status_code=400, detail=f"Not enough images provided for variant at index {idx}. Expected {image_count} images, but received {len(variant_images)}.")
+
+        # ---- Added this validation to check if the number of images provided exceeds image_count ----
+        if len(variant_images) > image_count:
+            raise HTTPException(status_code=400, detail=f"Too many images provided for variant at index {idx}. Expected {image_count} images, but received {len(variant_images)}.")
+
+        for _ in range(image_count):
+            if image_index >= len(variant_images):
+                raise HTTPException(status_code=400, detail=f"Not enough images provided for variant at index {idx}")
+
         for _ in range(image_count):
             if image_index >= len(variant_images):
                 raise HTTPException(status_code=400, detail=f"Not enough images provided for variant at index {idx}")
 
             image = variant_images[image_index]
-            filename = f"{uuid.uuid4()}_{image.filename}"
+            short_id = uuid.uuid4().hex[:8]  # 8 characters only
+            clean_filename = image.filename.replace(" ", "_").lower()
+            filename = f"{short_id}_{clean_filename}"
             file_path = os.path.join(UPLOAD_DIR, filename)
 
             # Save image
             with open(file_path, "wb") as buffer:
                 buffer.write(await image.read())
+            BASE_URL = "http://localhost:8000"  
+            image_url = f"{BASE_URL}/static/uploads/{filename}"
 
-            image_url = f"/static/uploads/{filename}"
             db.add(ProductImage(variant_id=new_variant.id, image_url=image_url))
             variant_image_urls.append(image_url)
             image_index += 1
@@ -141,8 +163,6 @@ async def add_product(
             "stock": stock,
             "discount": discount,
             "shipping_time": shipping_time,
-            "created_at": new_variant.created_at,
-            "updated_at": new_variant.updated_at,
             "attributes": attributes,
             "images": variant_image_urls
         })
@@ -164,40 +184,46 @@ async def add_product(
         images=[]
     )
 
-
-
-
-@router.get("/products", response_model=List[ProductResponse])
-def get_products(
-    db: Session = Depends(get_db),
-    category_id: Optional[int] = None
-):
-    query = db.query(Product)
-
-    # Check if category_id exists in the database
-    if category_id is not None:
-        category_exists = db.query(Category).filter(Category.id == category_id).first()
-        if not category_exists:
-            raise HTTPException(status_code=400, detail=f"Invalid category ID: {category_id}")
-        query = query.filter(Product.category_id == category_id)
-
-    products = query.all()
-
-    if category_id is not None and not products:
-        raise HTTPException(status_code=404, detail=f"No products found for category ID {category_id}.")
+#get all products
+@router.get("/allproducts", response_model=List[ProductResponse])
+def get_products(db: Session = Depends(get_db)):
+    products = db.query(Product).all()
 
     product_responses = []
     for product in products:
-        image_urls = [img.image_url for img in product.images]  # Extract image URLs
-        product_dict = product.__dict__.copy()  # Copy dictionary to avoid modifying the original
-        product_dict.pop("images", None)  # Remove 'images' key if exists
-        product_responses.append(ProductResponse(**product_dict, images=image_urls))
+        variants = []
+        for variant in product.variants:
+            variant_dict = {
+                "id": variant.id,
+                "price": variant.price,
+                "stock": variant.stock,
+                "discount": variant.discount,
+                "shipping_time": variant.shipping_time,
+                "attributes": variant.attributes or {},  # fallback to empty dict if None
+                "images": [img.image_url for img in variant.images],
+            }
+            variants.append(ProductVariantResponse(**variant_dict))
+
+        product_dict = {
+            "id": product.id,
+            "sku": product.sku,
+            "admin_id": product.admin_id,
+            "product_name": product.product_name,
+            "brand": product.brand,
+            "category_id": product.category_id,
+            "description": product.description,
+            "created_at": product.created_at,
+            "updated_at": product.updated_at,
+            "variants": variants,
+        }
+        product_responses.append(ProductResponse(**product_dict))
 
     return product_responses
+
 # GET product by ID
 from fastapi import Path
 from typing_extensions import Annotated
-@router.get("/products/{product_id}", response_model=ProductResponse)
+@router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -215,8 +241,6 @@ def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(ge
             "discount": variant.discount,
             "shipping_time": variant.shipping_time,
             "attributes": variant.attributes,
-            "created_at": variant.created_at,
-            "updated_at": variant.updated_at,
             "images": image_urls
         })
 
@@ -233,8 +257,9 @@ def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(ge
         variants=variant_list,
         images=[]
     )
+
 #get product by category
-@router.get("/products/category/{category_id}", response_model=List[ProductResponse])
+@router.get("/category/{category_id}", response_model=List[ProductResponse])
 def get_products_by_category(category_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
@@ -257,8 +282,6 @@ def get_products_by_category(category_id: Annotated[int, Path(ge=1)], db: Sessio
                 "discount": variant.discount,
                 "shipping_time": variant.shipping_time,
                 "attributes": variant.attributes,
-                "created_at": variant.created_at,
-                "updated_at": variant.updated_at,
                 "images": image_urls
             })
 
@@ -391,8 +414,6 @@ async def update_product(
                 "stock": new_variant.stock,
                 "discount": new_variant.discount,
                 "shipping_time": new_variant.shipping_time,
-                "created_at": new_variant.created_at,
-                "updated_at": new_variant.updated_at,
                 "attributes": new_variant.attributes,
                 "images": image_urls
             })
