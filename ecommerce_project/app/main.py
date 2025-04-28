@@ -33,12 +33,6 @@ app=FastAPI()
 
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
-# {
-#   "image_url": "http://localhost:8000/media/profiles/user_1.jpg"
-# }
-# They display it like:
-
-# <img src="http://localhost:8000/media/profiles/user_1.jpg" />
 
 app.add_middleware(
     CORSMiddleware,

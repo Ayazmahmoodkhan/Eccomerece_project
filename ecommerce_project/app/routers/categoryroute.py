@@ -4,13 +4,25 @@ from app.auth import get_current_user
 from app.utils import pwd_context
 from app.database import get_db
 from app.models import Category
+from typing import List
 from app.schemas import  CategoryResponse, CategoryCreate,CategoryUpdate
 router=APIRouter()
 router = APIRouter(prefix="/category", tags=["Category List"])
-# Public: Get all categories (Anyone can access)
+# Public: Get all categories 
 @router.get("/categories", response_model=list[CategoryResponse])
 def get_categories(db: Session = Depends(get_db)):
     categories=db.query(Category).all()
+    if not categories:
+        raise HTTPException(status_code=404, detail="No category found")
+    return categories
+
+# Get categories by ID
+@router.get("/{category_id}", response_model=List[CategoryResponse])
+def get_categories(
+    category_id: int,
+    db: Session = Depends(get_db)
+):
+    categories = db.query(Category).filter(Category.id == category_id).all()
     if not categories:
         raise HTTPException(status_code=404, detail="No category found")
     return categories

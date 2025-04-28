@@ -78,64 +78,13 @@ class CategoryResponse(CategoryBase):
     class Config:
         from_attributes = True
 
-# #class ProductVariantBase start
-# class ProductVariantBase(BaseModel):
-#     color: str
-#     price: float
-#     stock: int
-#     dicount:int
-#     shipping_time: Optional[int] = None
 
-# class ProductVariantCreate(ProductVariantBase):
-#     pass
-
-
-# class ProductVariantResponse(ProductVariantBase):
-#     id: int
-#     created_at: Optional[datetime]
-#     updated_at: Optional[datetime]
-
-#     model_config = {
-#         "from_attributes": True
-#     }
-
-
-# class ProductBase(BaseModel):
-#     product_name: str
-#     brand: str
-#     category_id: int
-#     description: str
-
-#     @field_validator("product_name", "brand", "description", mode="before")
-#     @classmethod
-#     def remove_extra_quotes(cls, value):
-#         return value.strip('"') if isinstance(value, str) else value
-
-
-# class ProductCreate(ProductBase):
-#     images: List[str]  # or List[UploadFile] if you're working with FastAPI forms
-#     variants: List[ProductVariantCreate]
-
-
-# class ProductResponse(ProductBase):
-#     id: int
-#     sku: str
-#     admin_id: int
-#     created_at: Optional[datetime]
-#     updated_at: Optional[datetime]
-#     images: List[str]
-#     variants: List[ProductVariantResponse] = []
-
-#     model_config = {
-#         "from_attributes": True
-#     }
-# #class ProductVariantBase end
 from decimal import Decimal
 from typing_extensions import Annotated
 class ProductVariantBase(BaseModel):
-    price: Annotated[Decimal, Field(gt=0)]  # price should be greater than 0
-    stock: Annotated[int, Field(ge=0)]  # stock should be a non-negative integer
-    discount: Optional[Annotated[int, Field(ge=0, le=100)]] = 0  # discount between 0 and 100
+    price: Annotated[Decimal, Field(gt=0)]  
+    stock: Annotated[int, Field(ge=0)] 
+    discount: Optional[Annotated[int, Field(ge=0, le=100)]] = 0  
     shipping_time: Optional[Annotated[int, Field(ge=0)]] = None  
     attributes: Dict[str, str]
 
@@ -148,7 +97,7 @@ class ProductVariantResponse(ProductVariantBase):
 
     model_config = {"from_attributes": True}
 
-# ---------------- Product ----------------
+# Product
 
 class ProductBase(BaseModel):
     product_name: str
@@ -177,13 +126,13 @@ class ProductResponse(ProductBase):
 
 # Cart Item Schema
 
-class CartItemBase(BaseModel):
-    product_id: int
-    quantity: int
-    subtotal: float
+# class CartItemBase(BaseModel):
+#     product_id: int
+#     quantity: int
+#     subtotal: float
 
-class CartItemCreate(CartItemBase):
-    pass
+# class CartItemCreate(CartItemBase):
+#     pass
 
 # class CartItemResponse(CartItemBase):
 #     id: int
@@ -289,7 +238,7 @@ class CouponResponse(CouponBase):
 # reviews schema
 class ReviewCreate(BaseModel):
     product_id: int
-    rating: int
+    rating: int 
     description: str
 
 class ReviewResponse(BaseModel):

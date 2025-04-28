@@ -11,40 +11,31 @@ from uuid import uuid4
 import os, uuid, json
 
 router=APIRouter(prefix="/products", tags=["Product panel"])
-#Product Management
-# @router.get("/products", response_model=List[ProductResponse])
-# def get_product(category_id:Optional[int]=None,db: Session=Depends(get_db)):
-#     if category_id:
-#         products=db.query(Product).filter(Product.category_id==category_id).all()
-#     else:
-#         products=db.query(Product).all()
-#     if not products:
-#         raise HTTPException(status_code=404, detail="No products found.")
-#     return products
+
 UPLOAD_DIR = "media/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/", response_model=ProductResponse)
+# Add Products
+
+@router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def add_product(
     product_name: str = Form(...),
     brand: str = Form(...),
+    is_feature: bool = Form(...),
     category_id: int = Form(...),
     description: str = Form(...),
-    variants: List[str] = Form(...), 
+    variants: List[str] = Form(...),
     variant_images: List[UploadFile] = File(...),
     admin: dict = Depends(admin_required),
     db: Session = Depends(get_db)
 ):
-    # ----- Admin check -----
     if admin.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can add products")
 
-    # ----- Category check -----
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=400, detail=f"Category ID {category_id} does not exist")
 
-    # ----- Clean text -----
     def clean(val: str) -> str:
         return val.strip('"') if isinstance(val, str) else val
 
@@ -52,116 +43,107 @@ async def add_product(
     brand = clean(brand)
     description = clean(description)
 
-    # ----- Create product -----
-    new_product = Product(
-        sku=str(uuid.uuid4()),
-        product_name=product_name,
-        brand=brand,
-        category_id=category_id,
-        description=description,
-        admin_id=admin.id
-    )
-    db.add(new_product)
-    db.commit()
-    db.refresh(new_product)
-
-    # ----- Handle variants -----
-    image_index = 0
-    created_variants = []
-
-    for idx, variant_str in enumerate(variants):
-        try:
-            variant_data = json.loads(variant_str)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail=f"Variant at index {idx} has invalid JSON format.")
-
-        # Validate required fields
-        required_fields = ["price", "stock"]
-        for field in required_fields:
-            if field not in variant_data:
-                raise HTTPException(status_code=400, detail=f"'{field}' is required in variant at index {idx}")
-
-        # Extract fields
-       
-        attributes = variant_data.get("attributes", {})
-        price = variant_data["price"]
-        stock = variant_data["stock"]
-        discount = variant_data.get("discount", 0)
-        shipping_time = variant_data.get("shipping_time")
-        image_count = variant_data.get("image_count", 1)
-
-        # ----- Field validations -----
-        if not isinstance(price, (int, float)) or price < 0:
-            raise HTTPException(status_code=400, detail=f"Invalid 'price' in variant at index {idx}")
-
-        if not isinstance(stock, int) or stock < 0:
-            raise HTTPException(status_code=400, detail=f"Invalid 'stock' in variant at index {idx}")
-
-        if not isinstance(discount, int) or not (0 <= discount <= 100):
-            raise HTTPException(status_code=400, detail=f"'discount' must be between 0 and 100 at index {idx}")
-
-        if shipping_time is not None and (not isinstance(shipping_time, int) or shipping_time < 0):
-            raise HTTPException(status_code=400, detail=f"Invalid 'shipping_time' in variant at index {idx}")
-
-        if not isinstance(attributes, dict):
-            raise HTTPException(status_code=400, detail=f"'attributes' must be a dictionary in variant at index {idx}")
-
-        if not isinstance(image_count, int) or image_count < 1:
-            raise HTTPException(status_code=400, detail=f"Invalid 'image_count' in variant at index {idx}")
-
-        # ----- Save Variant -----
-        direct_fields = {"price", "stock", "discount", "shipping_time", "image_count"}
-
-        # Now extract all keys except those and use as attributes
-        attributes = {k: v for k, v in variant_data.items() if k not in direct_fields}
-        new_variant = ProductVariant(
-            product_id=new_product.id,
-            price=price,
-            stock=stock,
-            discount=discount,
-            shipping_time=shipping_time,
-            attributes=attributes
+    try:
+        new_product = Product(
+            sku=str(uuid.uuid4()),
+            product_name=product_name,
+            brand=brand,
+            is_feature=is_feature,
+            category_id=category_id,
+            description=description,
+            admin_id=admin.id
         )
-        db.add(new_variant)
+        db.add(new_product)
+        db.flush()
+        db.refresh(new_product)
+
+        image_index = 0
+        created_variants = []
+
+        for idx, variant_str in enumerate(variants):
+            try:
+                variant_data = json.loads(variant_str)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail=f"Variant at index {idx} has invalid JSON format.")
+
+            required_fields = ["price", "stock"]
+            for field in required_fields:
+                if field not in variant_data:
+                    raise HTTPException(status_code=400, detail=f"'{field}' is required in variant at index {idx}")
+
+            attributes = variant_data.get("attributes", {})
+            price = variant_data["price"]
+            stock = variant_data["stock"]
+            discount = variant_data.get("discount", 0)
+            shipping_time = variant_data.get("shipping_time")
+            image_count = variant_data.get("image_count", 1)
+
+            if not isinstance(price, (int, float)) or price < 0:
+                raise HTTPException(status_code=400, detail=f"Invalid 'price' in variant at index {idx}")
+            if not isinstance(stock, int) or stock < 0:
+                raise HTTPException(status_code=400, detail=f"Invalid 'stock' in variant at index {idx}")
+            if not isinstance(discount, int) or not (0 <= discount <= 100):
+                raise HTTPException(status_code=400, detail=f"'discount' must be between 0 and 100 at index {idx}")
+            if shipping_time is not None and (not isinstance(shipping_time, int) or shipping_time < 0):
+                raise HTTPException(status_code=400, detail=f"Invalid 'shipping_time' in variant at index {idx}")
+            if not isinstance(attributes, dict):
+                raise HTTPException(status_code=400, detail=f"'attributes' must be a dictionary in variant at index {idx}")
+            if not isinstance(image_count, int) or image_count < 1:
+                raise HTTPException(status_code=400, detail=f"Invalid 'image_count' in variant at index {idx}")
+
+            # Extract dynamic attributes
+            direct_fields = {"price", "stock", "discount", "shipping_time", "image_count"}
+            attributes = {k: v for k, v in variant_data.items() if k not in direct_fields}
+
+            new_variant = ProductVariant(
+                product_id=new_product.id,
+                price=price,
+                stock=stock,
+                discount=discount,
+                shipping_time=shipping_time,
+                attributes=attributes
+            )
+            db.add(new_variant)
+            db.flush()
+            db.refresh(new_variant)
+
+            # Save images for this variant
+            variant_image_urls = []
+            for _ in range(image_count):
+                if image_index >= len(variant_images):
+                    raise HTTPException(status_code=400, detail=f"Not enough images provided for variant at index {idx}")
+
+                image = variant_images[image_index]
+                safe_filename = image.filename.replace(" ", "_")
+                filename = f"{uuid.uuid4()}_{safe_filename}"
+                file_path = os.path.join(UPLOAD_DIR, filename)
+
+                with open(file_path, "wb") as buffer:
+                    buffer.write(await image.read())
+
+                image_url = f"/media/uploads/{filename}"
+                db.add(ProductImage(variant_id=new_variant.id, image_url=image_url))
+                variant_image_urls.append(image_url)
+                image_index += 1
+
+            created_variants.append({
+                "id": new_variant.id,
+                "price": price,
+                "stock": stock,
+                "discount": discount,
+                "shipping_time": shipping_time,
+                "created_at": new_variant.created_at,
+                "updated_at": new_variant.updated_at,
+                "attributes": attributes,
+                "images": variant_image_urls
+            })
+
         db.commit()
-        db.refresh(new_variant)
 
-        # ----- Save Images -----
-        variant_image_urls = []
-        for _ in range(image_count):
-            if image_index >= len(variant_images):
-                raise HTTPException(status_code=400, detail=f"Not enough images provided for variant at index {idx}")
+    except Exception as e:
+        db.rollback()
+        raise e
 
-            image = variant_images[image_index]
-            safe_filename = image.filename.replace(" ", "_")
-            filename = f"{uuid.uuid4()}_{safe_filename}"
-            file_path = os.path.join(UPLOAD_DIR, filename)
-
-            # Save image
-            with open(file_path, "wb") as buffer:
-                buffer.write(await image.read())
-
-            image_url = f"/media/uploads/{filename}"
-            db.add(ProductImage(variant_id=new_variant.id, image_url=image_url))
-            variant_image_urls.append(image_url)
-            image_index += 1
-
-        # ----- Build variant response -----
-        created_variants.append({
-            "id": new_variant.id,
-            "price": price,
-            "stock": stock,
-            "discount": discount,
-            "shipping_time": shipping_time,
-            "created_at": new_variant.created_at,
-            "updated_at": new_variant.updated_at,
-            "attributes": attributes,
-            "images": variant_image_urls
-        })
-
-    db.commit()
-
-    # ----- Return response -----
     return ProductResponse(
         id=new_product.id,
         sku=new_product.sku,
@@ -177,6 +159,41 @@ async def add_product(
     )
 
 
+# Get only featured products
+@router.get("/featuredproducts", response_model=List[ProductResponse])
+def get_featured_products(db: Session = Depends(get_db)):
+    featured_products = db.query(Product).filter(Product.is_feature == True).all()
+
+    product_responses = []
+    for product in featured_products:
+        variants = []
+        for variant in product.variants:
+            variant_dict = {
+                "id": variant.id,
+                "price": variant.price,
+                "stock": variant.stock,
+                "discount": variant.discount,
+                "shipping_time": variant.shipping_time,
+                "attributes": variant.attributes or {},
+                "images": [img.image_url for img in variant.images],
+            }
+            variants.append(ProductVariantResponse(**variant_dict))
+
+        product_dict = {
+            "id": product.id,
+            "sku": product.sku,
+            "admin_id": product.admin_id,
+            "product_name": product.product_name,
+            "brand": product.brand,
+            "category_id": product.category_id,
+            "description": product.description,
+            "created_at": product.created_at,
+            "updated_at": product.updated_at,
+            "variants": variants,
+        }
+        product_responses.append(ProductResponse(**product_dict))
+
+    return product_responses
 
 
 #get all products
@@ -194,7 +211,7 @@ def get_products(db: Session = Depends(get_db)):
                 "stock": variant.stock,
                 "discount": variant.discount,
                 "shipping_time": variant.shipping_time,
-                "attributes": variant.attributes or {}, # fallback to empty dict if None
+                "attributes": variant.attributes or {}, 
                 "images": [img.image_url for img in variant.images],
             }
             variants.append(ProductVariantResponse(**variant_dict))
@@ -354,3 +371,25 @@ def get_products_by_rating(
         ))
 
     return product_responses
+
+ 
+
+# Delete products by ID
+
+# @router.delete("/delete/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+# def delete_product(
+#     product_id: int,
+#     admin: dict = Depends(admin_required),
+#     db: Session = Depends(get_db)
+# ):
+#     if admin.role != "admin":
+#         raise HTTPException(status_code=403, detail="Only admins can delete products")
+
+#     product = db.query(Product).filter(Product.id == product_id).first()
+#     if not product:
+#         raise HTTPException(status_code=404, detail="Product not found")
+
+#     db.delete(product)
+#     db.commit()
+
+#     return {"detail": f"Product with ID {product_id} has been deleted successfully"}
