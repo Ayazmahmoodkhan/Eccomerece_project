@@ -130,17 +130,23 @@ async def validate_token(token: str):
     return RedirectResponse(url=frontend_url)
 @app.post("/reset-password/")
 async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
-    """User ka password reset karega"""
     user_id = verify_reset_token(data.token)
     if not user_id:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    if data.new_password != data.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
     user.hashed_password = hash_password(data.new_password)
     db.add(user)
     db.commit()
+
     return {"message": "Password updated successfully"}
+
 #forgot password reset end
 
 # Routers  

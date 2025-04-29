@@ -9,7 +9,7 @@ from app.database import get_db
 
 SECRET_KEY = "e5f8a7d9c2b44e5db11a6e3f9f6b7c8d9a4e5f2a1b3c4d5e6f7a8b9c0d1e2f3"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRES_MINUTES = 120
+ACCESS_TOKEN_EXPIRES_MINUTES = 180
 
 
 def create_access_token(user_id: int):

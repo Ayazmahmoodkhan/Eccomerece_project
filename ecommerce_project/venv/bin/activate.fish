@@ -33,7 +33,11 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
+<<<<<<< HEAD
+set -gx VIRTUAL_ENV /home/waseem-baloch/Eccomerece_project/ecommerce_project/venv
+=======
 set -gx VIRTUAL_ENV /home/ayaz-blouch/Eccomerece_project-5/ecommerce_project/venv
+>>>>>>> 5af56e84a8d4cb20acd77498909816403db2d362
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH

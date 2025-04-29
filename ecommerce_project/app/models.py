@@ -150,8 +150,6 @@ class ProductVariant(Base):
     shipping_time = Column(Integer, nullable=True)
     attributes = Column(JSON, nullable=True, default={})
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     product = relationship("Product", back_populates="variants")
@@ -189,51 +187,75 @@ class ProductVariant(Base):
 
 
 #Order Table
+# class Order(Base):
+#     __tablename__ = "orders"
+    
+#     id = Column(Integer, primary_key=True, index=True)
+#     order_date = Column(DateTime, nullable=False)
+#     order_amount = Column(Float, nullable=False)
+#     shipping_date = Column(DateTime, nullable=True)
+#     order_status = Column(Enum(OrderStatus), nullable=False)
+#     is_canceled = Column(Boolean, default=False)
+#     cancel_reason = Column(String, nullable=True)
+#     coupon_code = Column(String, nullable=True)
+#     discount_amount = Column(Float, default=0.0)
+#     # cart_id = Column(Integer, ForeignKey("carts.id"))
+#     user_id = Column(Integer, ForeignKey("users.id"))
+#     created_timestamp = Column(DateTime, default=func.now())
+#     updated_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
+
+#     # Relationships
+#     payment = relationship("Payment", back_populates="order", uselist=False)
+#     user = relationship("User", back_populates="orders")
+#     order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+#     shipping_details = relationship("ShippingDetails", back_populates="order", uselist=False)
+#     refunds = relationship("Refund", back_populates="order", cascade="all, delete")
+
 class Order(Base):
-    __tablename__ = "orders"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    order_date = Column(DateTime, nullable=False)
-    order_amount = Column(Float, nullable=False)
-    shipping_date = Column(DateTime, nullable=True)
-    order_status = Column(Enum(OrderStatus), nullable=False)
-    is_canceled = Column(Boolean, default=False)
-    cancel_reason = Column(String, nullable=True)
-    coupon_code = Column(String, nullable=True)
-    discount_amount = Column(Float, default=0.0)
-    # cart_id = Column(Integer, ForeignKey("carts.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
-    created_timestamp = Column(DateTime, default=func.now())
-    updated_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
+        __tablename__ = "orders"
 
-    # Relationships
-    payment = relationship("Payment", back_populates="order", uselist=False)
-    user = relationship("User", back_populates="orders")
-    order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
-    shipping_details = relationship("ShippingDetails", back_populates="order", uselist=False)
-    refunds = relationship("Refund", back_populates="order", cascade="all, delete")
+        id = Column(Integer, primary_key=True, index=True)
+        order_date = Column(DateTime, nullable=False, default=func.now())
+        order_amount = Column(Float, nullable=False)  
+        shipping_charge = Column(Float, default=0.0)
+        discount_amount = Column(Float, default=0.0)
+        final_amount = Column(Float, nullable=False)
+        shipping_date = Column(DateTime, nullable=True)
+        order_status = Column(Enum(OrderStatus), nullable=False)
+        cancel_reason = Column(String, nullable=True)
+        coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=True)
+        user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+        created_timestamp = Column(DateTime, default=func.now())
+        updated_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
 
-
-    class Config:
-        orm_mode = True
+        # Relationships
+        user = relationship("User", back_populates="orders")
+        payment = relationship("Payment", back_populates="order", uselist=False)
+        order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+        shipping_details = relationship("ShippingDetails", back_populates="order", uselist=False)
+        refunds = relationship("Refund", back_populates="order", cascade="all, delete")
+        coupon = relationship("Coupon", back_populates="orders", uselist=False)
 from sqlalchemy.sql import func
-# Order Item Table
+    # Order Item Table
 class OrderItem(Base):
-    __tablename__ = "order_items"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"))
-    variant_id = Column(Integer, ForeignKey("product_variants.id"))
-    mrp = Column(Float, nullable=False)
-    quantity = Column(Integer, nullable=False)
+        __tablename__ = "order_items"
+        
+        id = Column(Integer, primary_key=True, index=True)
+        order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+        product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+        variant_id = Column(Integer, ForeignKey("product_variants.id"), nullable=False)
 
-    # Relationships
-    order = relationship("Order", back_populates="order_items")
-    product = relationship("Product", back_populates="order_items")
-    variant = relationship("ProductVariant", back_populates="order_items")
-    class Config:
-        orm_mode = True
+        mrp = Column(Float, nullable=False)
+        quantity = Column(Integer, nullable=False)
+        total_price = Column(Float, nullable=False)  # Optional but useful
+
+        # Relationships
+        order = relationship("Order", back_populates="order_items")
+        product = relationship("Product", back_populates="order_items")
+        variant = relationship("ProductVariant", back_populates="order_items")
+
+        class Config:
+            orm_mode = True
 
 
 # Review Table
@@ -330,6 +352,7 @@ class Coupon(Base):
     is_active = Column(Boolean, default=True)
     expiry_date = Column(DateTime, nullable=True)
     usage_limit = Column(Integer, nullable=True)
+    orders = relationship("Order", back_populates="coupon")
 
 # Refunds Table
 

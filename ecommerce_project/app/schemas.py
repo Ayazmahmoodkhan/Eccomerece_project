@@ -16,10 +16,20 @@ class UserLogin(BaseModel):
     username:str
     password:str
 
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    username: str
+    email: EmailStr
+    role: str
+
+    class Config:
+        orm_mode = True
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+    confirm_password:str
 #schemas for address form
 class Addressbase(BaseModel):
     street:str
@@ -90,7 +100,6 @@ class ProductVariantBase(BaseModel):
 
 class ProductVariantCreate(ProductVariantBase):
     images: List[str]  
-
 class ProductVariantResponse(ProductVariantBase):
     id: int
     images: List[str]
@@ -157,8 +166,16 @@ class ProductResponse(ProductBase):
 #     created_at: datetime
 #     cart_items: List[CartItemResponse]
 
-#     class Config:
-#         from_attributes = True
+
+    class Config:
+        from_attributes = True
+class ProductImageResponse(BaseModel):
+    id: int
+    image_url: str
+
+    class Config:
+        orm_mode = True
+
 
 
 
@@ -171,52 +188,171 @@ class OrderStatus(str, Enum):
     cancelled = "cancelled"
 
 
-# OrderItem Response
-class OrderItem(BaseModel):
-    id: int
+# # OrderItem Schema
+# class OrderItemBase(BaseModel):
+#     product_id: int
+#     mrp: float
+#     quantity: int
+
+# class OrderItemCreate(OrderItemBase):
+#     pass
+
+# class OrderItem(OrderItemBase):
+#     id: int
+
+#     class Config:
+#         orm_mode = True
+
+# # Order Schema
+# class OrderBase(BaseModel):
+#     order_date: datetime
+#     order_amount: float
+#     shipping_date: Optional[datetime] = None
+#     order_status: OrderStatus
+
+# class OrderCreate(OrderBase):
+#     cart_id: int
+#     user_id: int
+#     items: List[OrderItemCreate]  # nested order items
+
+# class OrderResponse(OrderBase):
+#     id: int
+#     created_timestamp: datetime
+#     updated_timestamp: datetime
+#     items: List[OrderItem] = Field(..., alias="order_items")
+
+#     class Config:
+#         orm_mode = True
+#         allow_population_by_field_name = True 
+
+# class OrderUpdate(BaseModel):
+#     order_date: Optional[datetime] = None
+#     order_amount: Optional[float] = None
+#     shipping_date: Optional[datetime] = None
+#     order_status: Optional[OrderStatus] = None
+
+#     class Config:
+#         orm_mode = True
+# # Cancel order request
+# class OrderCancelRequest(BaseModel):
+#     cancel_reason: Optional[str] = None
+
+# class OrderCancelResponse(BaseModel):
+#     id: int
+#     is_canceled: bool
+#     cancel_reason: Optional[str]
+
+#     class Config:
+#         orm_mode = True
+# # Apply Coupon Request in Order
+
+# class ApplyCouponRequest(BaseModel):
+#     coupon_code: str
+
+# # Coupons Schema
+
+# class CouponBase(BaseModel):
+#     code: str
+#     discount_type: Literal["percentage", "fixed"]
+#     discount_value: float
+#     expiry_date: Optional[datetime] = None
+#     usage_limit: Optional[int] = None
+
+# class CouponCreate(CouponBase):
+#     pass
+
+# class CouponResponse(CouponBase):
+#     id: int
+#     is_active: bool
+
+#     class Config:
+#         orm_mode = True
+
+#new schemas
+# -------- Order Status Enum --------
+class OrderStatus(str, Enum):
+    pending = "pending"
+    shipped = "shipped"
+    delivered = "delivered"
+    cancelled = "cancelled"
+
+
+# -------- OrderItem Schemas --------
+class OrderItemBase(BaseModel):
+
     product_id: int
-    mrp: float
+    variant_id: int
     quantity: int
 
+
+class OrderItemCreate(OrderItemBase):
+    pass
+
+class OrderItemResponse(BaseModel):
+    id: int
+    product_id: int
+    variant_id: int
+    quantity: int
+    mrp: float
+    total_price: float
+
+    # product: Optional[ProductResponse]
+    # variant: Optional[ProductVariantResponse]
+
     class Config:
         orm_mode = True
 
-# Order Create 
-class OrderCreate(BaseModel):
-    cart_id: int
-    coupon_code: Optional[str] = None
+# -------- Order Schemas --------
+class OrderBase(BaseModel):
+    order_date: datetime = Field(default_factory=datetime.utcnow)
+    shipping_date: Optional[datetime] = None
+    order_status: OrderStatus = OrderStatus.pending
+    coupon_id: Optional[int] = None
 
-# Order Response
-class OrderResponse(BaseModel):
+class OrderCreate(OrderBase):
+    order_items: List[OrderItemCreate]
+
+class OrderResponse(OrderBase):
     id: int
-    order_date: datetime
+    user_id: int
+    user: Optional[UserResponse]
+    order_date: datetime 
     order_amount: float
-    discount_amount: Optional[float]
-    shipping_date: Optional[datetime]
-    order_status: OrderStatus
+    shipping_charge: float
+    discount_amount: float
+    final_amount: float
+    cancel_reason: Optional[str]
     created_timestamp: datetime
     updated_timestamp: datetime
-    cart_id: int
-    items: List[OrderItem] = Field(..., alias="order_items")
+    order_items: List[OrderItemResponse]
+    # shipping_date:int
 
     class Config:
         orm_mode = True
-        allow_population_by_field_name = True
- # Order Update
+
 class OrderUpdate(BaseModel):
-    order_date: Optional[datetime] = None
-    order_amount: Optional[float] = None
-    shipping_date: Optional[datetime] = None
     order_status: Optional[OrderStatus] = None
+    cancel_reason: Optional[str] = None
+    shipping_date: Optional[datetime] = None
 
     class Config:
         orm_mode = True
 
-# Apply Coupon
-class ApplyCouponRequest(BaseModel):
-    coupon_code: str
 
-# Coupon Schemas
+# -------- Cancel Order --------
+class OrderCancelRequest(BaseModel):
+    cancel_reason: Optional[str] = None
+
+class OrderCancelResponse(BaseModel):
+    id: int
+    cancel_reason: Optional[str]
+    order_status: OrderStatus
+
+    class Config:
+        orm_mode = True
+
+
+
 class CouponBase(BaseModel):
     code: str
     discount_type: Literal["percentage", "fixed"]
@@ -233,6 +369,10 @@ class CouponResponse(CouponBase):
 
     class Config:
         orm_mode = True
+
+class ApplyCouponRequest(BaseModel):
+    coupon_code: str
+#end new schemas
 
 
 # reviews schema
