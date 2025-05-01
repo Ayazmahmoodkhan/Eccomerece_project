@@ -1,9 +1,9 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator,condecimal, conint
+from pydantic import BaseModel, EmailStr, Field, field_validator,condecimal, conint, ConfigDict
+
 from datetime import date,datetime
 from enum import Enum
 from typing import Optional, List, Any, Literal,Dict
 from app.models import RatingEnum
-
 
 class UserCreate(BaseModel):
     name: str = Field(..., min_length=3, max_length=50)
@@ -23,8 +23,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: str
 
-    class Config:
-        orm_mode = True
+    model_config=ConfigDict(from_attributes=True)
 
 class ResetPasswordRequest(BaseModel):
     token: str
@@ -43,8 +42,7 @@ class AddressUpdate(Addressbase):
 class AddressResponse(Addressbase):
     id:int
     user_id:int
-    class Config:
-        from_attributes=True
+    model_config = ConfigDict(from_attributes=True)
 #end
 #schema for user profile
 class UserProfileBase(BaseModel):
@@ -63,8 +61,7 @@ class UserProfileResponse(UserProfileBase):
     id: int
     user_id: int
 
-    class Config:
-        from_attributes=True
+    model_config = ConfigDict(from_attributes=True)
 #end
 
 
@@ -85,8 +82,7 @@ class CategoryUpdate(BaseModel):
 class CategoryResponse(CategoryBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 from decimal import Decimal
@@ -103,10 +99,18 @@ class ProductVariantCreate(ProductVariantBase):
 class ProductVariantResponse(ProductVariantBase):
     id: int
     images: List[str]
+    attributes: Optional[Dict[str, str]] = {}
 
-    model_config = {"from_attributes": True}
+    @field_validator("images", mode="before")
+    @classmethod
+    def extract_image_paths(cls, value):
+        if isinstance(value, list) and all(hasattr(i, "image_url") for i in value):
+            return [i.image_url for i in value]
+        return value
+    model_config = ConfigDict(from_attributes=True)
 
 # Product
+
 
 class ProductBase(BaseModel):
     product_name: str
@@ -130,7 +134,7 @@ class ProductResponse(ProductBase):
     updated_at: Optional[datetime]
     variants: List[ProductVariantResponse] = []
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Cart Item Schema
@@ -165,16 +169,11 @@ class ProductResponse(ProductBase):
 #     grand_total: float  
 #     created_at: datetime
 #     cart_items: List[CartItemResponse]
-
-
-    class Config:
-        from_attributes = True
 class ProductImageResponse(BaseModel):
     id: int
     image_url: str
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True) 
 
 
 
@@ -299,8 +298,7 @@ class OrderItemResponse(BaseModel):
     # product: Optional[ProductResponse]
     # variant: Optional[ProductVariantResponse]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 # -------- Order Schemas --------
 class OrderBase(BaseModel):
@@ -327,16 +325,14 @@ class OrderResponse(OrderBase):
     order_items: List[OrderItemResponse]
     # shipping_date:int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OrderUpdate(BaseModel):
     order_status: Optional[OrderStatus] = None
     cancel_reason: Optional[str] = None
     shipping_date: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # -------- Cancel Order --------
@@ -348,8 +344,7 @@ class OrderCancelResponse(BaseModel):
     cancel_reason: Optional[str]
     order_status: OrderStatus
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 
@@ -367,8 +362,7 @@ class CouponResponse(CouponBase):
     id: int
     is_active: bool
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ApplyCouponRequest(BaseModel):
     coupon_code: str
@@ -389,8 +383,7 @@ class ReviewResponse(BaseModel):
     description: str
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 # schema for pyment table
 
@@ -428,8 +421,7 @@ class PaymentResponse(PaymentBase):
     created_timestamp: datetime
     updated_timestamp: Optional[datetime]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 # schema for payments logs
 
@@ -458,8 +450,7 @@ class RefundResponse(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 
@@ -494,8 +485,7 @@ class ShippingDetailsResponse(ShippingDetailsBase):
     created_timestamp: datetime
     updated_timestamp: Optional[datetime]
 
-    class config:
-        orm_mode: True
+    model_config = ConfigDict(from_attributes=True)
 
 
 
