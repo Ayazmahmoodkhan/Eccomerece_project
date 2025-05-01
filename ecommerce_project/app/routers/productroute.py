@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile, File, Query, Path
 from sqlalchemy.orm import Session
+from typing_extensions import Annotated
 from sqlalchemy import func, cast, Float
 from app.models import User, Product, ProductImage, Category,ProductVariant,VariantAttribute,CategoryVariantAttribute,Review
 from app.schemas import  ProductCreate,ProductResponse, ProductVariantResponse, ProductVariantCreate
@@ -8,12 +9,16 @@ from app.auth import get_current_user
 from app.routers.admin import admin_required
 from typing import Optional, List
 from uuid import uuid4
-import os, uuid, json
+import os, uuid, json, csv
+
+
 
 router=APIRouter(prefix="/products", tags=["Product panel"])
 
 UPLOAD_DIR = "media/uploads"
+ERROR_DIR = "media/errors"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(ERROR_DIR, exist_ok=True)
 
 # Add Products
 
@@ -105,10 +110,10 @@ async def add_product(
             raise HTTPException(status_code=400, detail=f"Invalid 'image_count' in variant at index {idx}")
 
             # Extract dynamic attributes
-            direct_fields = {"price", "stock", "discount", "shipping_time", "image_count"}
-            attributes = {k: v for k, v in variant_data.items() if k not in direct_fields}
+        direct_fields = {"price", "stock", "discount", "shipping_time", "image_count"}
+        attributes = {k: v for k, v in variant_data.items() if k not in direct_fields}
 
-            new_variant = ProductVariant(
+        new_variant = ProductVariant(
                 product_id=new_product.id,
                 price=price,
                 stock=stock,
@@ -116,17 +121,14 @@ async def add_product(
                 shipping_time=shipping_time,
                 attributes=attributes
             )
-            db.add(new_variant)
-            db.flush()
-            db.refresh(new_variant)
+        db.add(new_variant)
+        db.flush()
+        db.refresh(new_variant)    
 
-        # ----- Save Images -----
         variant_image_urls = []
-                # ---- Added this validation to check if the number of images provided matches image_count ----
         if len(variant_images) < image_count:
             raise HTTPException(status_code=400, detail=f"Not enough images provided for variant at index {idx}. Expected {image_count} images, but received {len(variant_images)}.")
 
-        # ---- Added this validation to check if the number of images provided exceeds image_count ----
         if len(variant_images) > image_count:
             raise HTTPException(status_code=400, detail=f"Too many images provided for variant at index {idx}. Expected {image_count} images, but received {len(variant_images)}.")
 
@@ -139,13 +141,13 @@ async def add_product(
                 raise HTTPException(status_code=400, detail=f"Not enough images provided for variant at index {idx}")
 
             image = variant_images[image_index]
-            short_id = uuid.uuid4().hex[:8]  # 8 characters only
+            short_id = uuid.uuid4().hex[:8]  
             clean_filename = image.filename.replace(" ", "_").lower()
             filename = f"{short_id}_{clean_filename}"
             file_path = os.path.join(UPLOAD_DIR, filename)
 
-                with open(file_path, "wb") as buffer:
-                    buffer.write(await image.read())
+            with open(file_path, "wb") as buffer:
+                buffer.write(await image.read())
 
                 image_url = f"/media/uploads/{filename}"
                 db.add(ProductImage(variant_id=new_variant.id, image_url=image_url))
@@ -182,6 +184,126 @@ async def add_product(
         variants=created_variants,
         images=[]
     )
+
+# Create Products in Bulk Through CSV File
+
+def save_image(file: UploadFile, product_name: str, attributes: dict) -> str:
+    ext = os.path.splitext(file.filename)[1]
+    product_slug = product_name.lower().replace(" ", "_")
+    filename = f"{product_slug}_{uuid4().hex[:6]}{ext}"
+    path = os.path.join(UPLOAD_DIR, filename)
+    with open(path, "wb") as f:
+        f.write(file.file.read())
+    return f"/media/uploads/{filename}"
+
+
+@router.post("/bulk-upload", status_code=status.HTTP_201_CREATED)
+async def upload_products_csv(
+    file: UploadFile = File(...),
+    images: List[UploadFile] = File(...),
+    admin=Depends(admin_required),
+    db: Session = Depends(get_db)
+):
+    if admin.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can add products")
+
+    content = await file.read()
+    decoded = content.decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded)
+
+    error_rows = []
+    success_count = 0
+    image_map = {img.filename: img for img in images}
+
+    product_cache = {}
+
+    for idx, row in enumerate(reader):
+        try:
+            # ----- Validate required fields -----
+            required_fields = ["product_name", "brand", "is_feature", "category_id", "description",
+                               "price", "stock", "attributes", "image_filenames"]
+            for field in required_fields:
+                if not row.get(field):
+                    raise ValueError(f"Missing required field '{field}'")
+
+            product_name = row["product_name"].strip()
+            brand = row["brand"].strip()
+            is_feature = row["is_feature"].lower() == "true"
+            category_id = int(row["category_id"])
+            description = row["description"].strip()
+            price = float(row["price"])
+            stock = int(row["stock"])
+            discount = int(row.get("discount", 0))
+            shipping_time = int(row.get("shipping_time", 0))
+            attributes = json.loads(row["attributes"])
+            image_filenames = [img.strip() for img in row["image_filenames"].split(",")]
+
+            category = db.query(Category).filter(Category.id == category_id).first()
+            if not category:
+                raise ValueError(f"Category ID {category_id} does not exist")
+
+            # ----- Check if product already created -----
+            product_key = f"{product_name}_{category_id}"
+            if product_key in product_cache:
+                new_product = product_cache[product_key]
+            else:
+                new_product = Product(
+                    sku=str(uuid4()),
+                    product_name=product_name,
+                    brand=brand,
+                    is_feature=is_feature,
+                    category_id=category_id,
+                    description=description,
+                    admin_id=admin.id
+                )
+                db.add(new_product)
+                db.flush()
+                db.refresh(new_product)
+                product_cache[product_key] = new_product
+
+            # ----- Create Variant -----
+            new_variant = ProductVariant(
+                product_id=new_product.id,
+                price=price,
+                stock=stock,
+                discount=discount,
+                shipping_time=shipping_time,
+                attributes=attributes
+            )
+            db.add(new_variant)
+            db.flush()
+            db.refresh(new_variant)
+
+            # ----- Save Images -----
+            for img_name in image_filenames:
+                if img_name not in image_map:
+                    raise ValueError(f"Image file '{img_name}' not found in upload")
+                img_url = save_image(image_map[img_name], product_name, attributes)
+                db.add(ProductImage(variant_id=new_variant.id, image_url=img_url))
+
+            db.commit()
+            success_count += 1
+
+        except Exception as e:
+            db.rollback()
+            row["error"] = str(e)
+            error_rows.append(row)
+
+    # ----- Save errors to CSV -----
+    error_file_path = None
+    if error_rows:
+        error_file_path = os.path.join(ERROR_DIR, f"errors_{uuid4().hex[:6]}.csv")
+        with open(error_file_path, "w", newline="", encoding="utf-8") as err_file:
+            writer = csv.DictWriter(err_file, fieldnames=reader.fieldnames + ["error"])
+            writer.writeheader()
+            writer.writerows(error_rows)
+
+    return {
+        "message": f"{success_count} variants uploaded successfully",
+        "errors": len(error_rows),
+        "error_file": error_file_path,
+        "error_details": error_rows[:5]
+    }
 
 
 # Get only featured products
@@ -257,13 +379,7 @@ def get_products(db: Session = Depends(get_db)):
     return product_responses
 
 # GET product by ID
-from fastapi import Path
-from typing_extensions import Annotated
-@router.get("/{product_id}", response_model=ProductResponse)
-def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
-# GET product by ID
-from fastapi import Path
-from typing_extensions import Annotated
+
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -472,7 +588,7 @@ async def update_product(
         admin_id=product.admin_id,
         created_at=product.created_at,
         updated_at=product.updated_at,
-        variants=variant_list,
+        variants= variants,
         images=[]
     )
 

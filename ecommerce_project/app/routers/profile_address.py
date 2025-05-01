@@ -4,7 +4,7 @@ from app.models import UserProfile, Address
 from app.schemas import  AddressCreate, AddressUpdate, UserProfileCreate, UserProfileUpdate
 from app.database import get_db
 from app.auth import get_current_user
-from app.models import UserProfile
+from app.models import UserProfile, User
 import shutil
 import glob
 import os
@@ -54,6 +54,22 @@ def get_my_profile(db: Session = Depends(get_db), current_user=Depends(get_curre
     if not profile:
         return {"message": "Profile not found"}
     return profile
+
+@router.get("/profile/{user_id}")
+def get_user_profile_by_id(user_id: int, db: Session = Depends(get_db)):
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found.")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    return {
+        "name": user.name,
+        "profile_picture": profile.profile_picture
+    }
+
 
 # Create Profile
 @router.post("/profile", status_code=status.HTTP_201_CREATED)

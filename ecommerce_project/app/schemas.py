@@ -104,7 +104,8 @@ class ProductVariantResponse(ProductVariantBase):
     id: int
     images: List[str]
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 # Product
 
@@ -130,7 +131,8 @@ class ProductResponse(ProductBase):
     updated_at: Optional[datetime]
     variants: List[ProductVariantResponse] = []
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 # Cart Item Schema
@@ -380,14 +382,24 @@ class ReviewCreate(BaseModel):
     product_id: int
     rating: int 
     description: str
+    email : EmailStr
 
 class ReviewResponse(BaseModel):
     id: int
     product_id: int
     user_id: int
+    email: str
     rating: int
     description: str
     created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+# Review Update Schema
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(ge=1, le=5)
+    description: Optional[str] = Field(max_length=500)
 
     class Config:
         orm_mode = True
