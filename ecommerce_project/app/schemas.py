@@ -1,28 +1,35 @@
-from pydantic import BaseModel, EmailStr, Field,HttpUrl, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator,condecimal, conint
 from datetime import date,datetime
 from enum import Enum
-from typing import Optional, List, Any, Literal
+from typing import Optional, List, Any, Literal,Dict
 from app.models import RatingEnum
 
-class UserRoleEnum(str,Enum):
-    admin="admin"
-    user="user"
+
 class UserCreate(BaseModel):
     name: str = Field(..., min_length=3, max_length=50)
     username: str = Field(..., min_length=3, max_length=25)
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=20)
     confirm_password: str = Field(..., min_length=6, max_length=20)
-    role: UserRoleEnum=UserRoleEnum.user
 
 class UserLogin(BaseModel):
     username:str
     password:str
 
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    username: str
+    email: EmailStr
+    role: str
+
+    class Config:
+        orm_mode = True
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+    confirm_password:str
 #schemas for address form
 class Addressbase(BaseModel):
     street:str
@@ -80,66 +87,60 @@ class CategoryResponse(CategoryBase):
 
     class Config:
         from_attributes = True
-# Product Schema
-# class ProductBase(BaseModel):
-#     product_name: str
-#     price: float
-#     discount: float
-#     stock: int
-#     brand: str
-#     category_id: int
-#     description: str
-#     color: str
-#     shipping_time: str
 
-# class ProductCreate(ProductBase):
-#     images: List[str]  # Image URLs as a list of strings
 
-# class ProductResponse(ProductBase):
-#     id: int
-#     sku: str
-#     admin_id: int
-#     images: List[str]
+from decimal import Decimal
+from typing_extensions import Annotated
+class ProductVariantBase(BaseModel):
+    price: Annotated[Decimal, Field(gt=0)]  
+    stock: Annotated[int, Field(ge=0)] 
+    discount: Optional[Annotated[int, Field(ge=0, le=100)]] = 0  
+    shipping_time: Optional[Annotated[int, Field(ge=0)]] = None  
+    attributes: Dict[str, str]
 
-#     class Config:
-#         from_attributes = True
+class ProductVariantCreate(ProductVariantBase):
+    images: List[str]  
+class ProductVariantResponse(ProductVariantBase):
+    id: int
+    images: List[str]
+
+    class Config:
+        from_attributes = True
+
+# Product
 
 class ProductBase(BaseModel):
     product_name: str
-    price: float
-    discount: float
-    stock: int
     brand: str
     category_id: int
     description: str
-    color: str
-    shipping_time: str
+
+    @field_validator("product_name", "brand", "description", mode="before")
+    @classmethod
+    def remove_extra_quotes(cls, value):
+        return value.strip('"') if isinstance(value, str) else value
 
 class ProductCreate(ProductBase):
-    images: List[str]  
+    variants: List[ProductVariantCreate]
 
 class ProductResponse(ProductBase):
     id: int
     sku: str
-    images: List[str]  
-
-    @field_validator(
-        "product_name", "brand", "description", "color", "shipping_time", mode="before"
-    )
-    @classmethod
-    def remove_extra_quotes(cls, value):
-        return value.strip('"') if isinstance(value, str) else value
+    admin_id: int
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    variants: List[ProductVariantResponse] = []
 
     class Config:
         from_attributes = True
 
 
-
-# #  Cart Item Schemas 
+# Cart Item Schema
 
 # class CartItemBase(BaseModel):
 #     product_id: int
 #     quantity: int
+#     subtotal: float
 
 # class CartItemCreate(CartItemBase):
 #     pass
@@ -167,8 +168,16 @@ class ProductResponse(ProductBase):
 #     created_at: datetime
 #     cart_items: List[CartItemResponse]
 
-#     class Config:
-#         from_attributes = True
+
+    class Config:
+        from_attributes = True
+class ProductImageResponse(BaseModel):
+    id: int
+    image_url: str
+
+    class Config:
+        orm_mode = True
+
 
 
 
@@ -181,52 +190,171 @@ class OrderStatus(str, Enum):
     cancelled = "cancelled"
 
 
-# OrderItem Response
-class OrderItem(BaseModel):
-    id: int
+# # OrderItem Schema
+# class OrderItemBase(BaseModel):
+#     product_id: int
+#     mrp: float
+#     quantity: int
+
+# class OrderItemCreate(OrderItemBase):
+#     pass
+
+# class OrderItem(OrderItemBase):
+#     id: int
+
+#     class Config:
+#         orm_mode = True
+
+# # Order Schema
+# class OrderBase(BaseModel):
+#     order_date: datetime
+#     order_amount: float
+#     shipping_date: Optional[datetime] = None
+#     order_status: OrderStatus
+
+# class OrderCreate(OrderBase):
+#     cart_id: int
+#     user_id: int
+#     items: List[OrderItemCreate]  # nested order items
+
+# class OrderResponse(OrderBase):
+#     id: int
+#     created_timestamp: datetime
+#     updated_timestamp: datetime
+#     items: List[OrderItem] = Field(..., alias="order_items")
+
+#     class Config:
+#         orm_mode = True
+#         allow_population_by_field_name = True 
+
+# class OrderUpdate(BaseModel):
+#     order_date: Optional[datetime] = None
+#     order_amount: Optional[float] = None
+#     shipping_date: Optional[datetime] = None
+#     order_status: Optional[OrderStatus] = None
+
+#     class Config:
+#         orm_mode = True
+# # Cancel order request
+# class OrderCancelRequest(BaseModel):
+#     cancel_reason: Optional[str] = None
+
+# class OrderCancelResponse(BaseModel):
+#     id: int
+#     is_canceled: bool
+#     cancel_reason: Optional[str]
+
+#     class Config:
+#         orm_mode = True
+# # Apply Coupon Request in Order
+
+# class ApplyCouponRequest(BaseModel):
+#     coupon_code: str
+
+# # Coupons Schema
+
+# class CouponBase(BaseModel):
+#     code: str
+#     discount_type: Literal["percentage", "fixed"]
+#     discount_value: float
+#     expiry_date: Optional[datetime] = None
+#     usage_limit: Optional[int] = None
+
+# class CouponCreate(CouponBase):
+#     pass
+
+# class CouponResponse(CouponBase):
+#     id: int
+#     is_active: bool
+
+#     class Config:
+#         orm_mode = True
+
+#new schemas
+# -------- Order Status Enum --------
+class OrderStatus(str, Enum):
+    pending = "pending"
+    shipped = "shipped"
+    delivered = "delivered"
+    cancelled = "cancelled"
+
+
+# -------- OrderItem Schemas --------
+class OrderItemBase(BaseModel):
+
     product_id: int
-    mrp: float
+    variant_id: int
     quantity: int
 
+
+class OrderItemCreate(OrderItemBase):
+    pass
+
+class OrderItemResponse(BaseModel):
+    id: int
+    product_id: int
+    variant_id: int
+    quantity: int
+    mrp: float
+    total_price: float
+
+    # product: Optional[ProductResponse]
+    # variant: Optional[ProductVariantResponse]
+
     class Config:
         orm_mode = True
 
-# Order Create 
-class OrderCreate(BaseModel):
-    cart_id: int
-    coupon_code: Optional[str] = None
+# -------- Order Schemas --------
+class OrderBase(BaseModel):
+    order_date: datetime = Field(default_factory=datetime.utcnow)
+    shipping_date: Optional[datetime] = None
+    order_status: OrderStatus = OrderStatus.pending
+    coupon_id: Optional[int] = None
 
-# Order Response
-class OrderResponse(BaseModel):
+class OrderCreate(OrderBase):
+    order_items: List[OrderItemCreate]
+
+class OrderResponse(OrderBase):
     id: int
-    order_date: datetime
+    user_id: int
+    user: Optional[UserResponse]
+    order_date: datetime 
     order_amount: float
-    discount_amount: Optional[float]
-    shipping_date: Optional[datetime]
-    order_status: OrderStatus
+    shipping_charge: float
+    discount_amount: float
+    final_amount: float
+    cancel_reason: Optional[str]
     created_timestamp: datetime
     updated_timestamp: datetime
-    cart_id: int
-    items: List[OrderItem] = Field(..., alias="order_items")
+    order_items: List[OrderItemResponse]
+    # shipping_date:int
 
     class Config:
         orm_mode = True
-        allow_population_by_field_name = True
- # Order Update
+
 class OrderUpdate(BaseModel):
-    order_date: Optional[datetime] = None
-    order_amount: Optional[float] = None
-    shipping_date: Optional[datetime] = None
     order_status: Optional[OrderStatus] = None
+    cancel_reason: Optional[str] = None
+    shipping_date: Optional[datetime] = None
 
     class Config:
         orm_mode = True
 
-# Apply Coupon
-class ApplyCouponRequest(BaseModel):
-    coupon_code: str
 
-# Coupon Schemas
+# -------- Cancel Order --------
+class OrderCancelRequest(BaseModel):
+    cancel_reason: Optional[str] = None
+
+class OrderCancelResponse(BaseModel):
+    id: int
+    cancel_reason: Optional[str]
+    order_status: OrderStatus
+
+    class Config:
+        orm_mode = True
+
+
+
 class CouponBase(BaseModel):
     code: str
     discount_type: Literal["percentage", "fixed"]
@@ -244,20 +372,34 @@ class CouponResponse(CouponBase):
     class Config:
         orm_mode = True
 
+class ApplyCouponRequest(BaseModel):
+    coupon_code: str
+#end new schemas
+
 
 # reviews schema
 class ReviewCreate(BaseModel):
     product_id: int
-    rating: int
+    rating: int 
     description: str
+    email : EmailStr
 
 class ReviewResponse(BaseModel):
-    review_id: int
+    id: int
     product_id: int
     user_id: int
+    email: str
     rating: int
     description: str
     created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+# Review Update Schema
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(ge=1, le=5)
+    description: Optional[str] = Field(max_length=500)
 
     class Config:
         orm_mode = True

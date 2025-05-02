@@ -1,0 +1,4 @@
+product_name,brand,is_feature,category_id,description,price,stock,discount,shipping_time,attributes,image_count,error
+T-shirt,Nike,False,6,Cotton T-shirt for men,1200,50,10,3,"{""color"": ""red"", ""size"": ""M"", ""gender"": ""male""}",2,Image file '2' not found in upload
+T-shirt,Nike,False,6,Cotton T-shirt for men,1300,40,15,2,"{""color"": ""blue"", ""size"": ""L"", ""gender"": ""male""}",1,Image file '1' not found in upload
+Jeans,Levi's,False,6,Regular fit jeans,2500,30,5,4,"{""color"": ""black"", ""waist"": ""32"", ""gender"": ""male""}",3,Image file '3' not found in upload

@@ -1,11 +1,51 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.models import UserProfile, Address
 from app.schemas import  AddressCreate, AddressUpdate, UserProfileCreate, UserProfileUpdate
 from app.database import get_db
 from app.auth import get_current_user
+from app.models import UserProfile, User
+import shutil
+import glob
+import os
 
 router = APIRouter()
+
+#  User profile Picture
+
+
+@router.post("/upload-picture/", status_code = status.HTTP_201_CREATED )
+def upload_profile_picture(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image.")
+
+    upload_dir = "media/profiles"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    existing_files = glob.glob(f"{upload_dir}/user_{current_user.id}.*")
+    for old_file in existing_files:
+        os.remove(old_file)
+
+    file_ext = file.filename.split(".")[-1]
+    file_path = f"{upload_dir}/user_{current_user.id}.{file_ext}"
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    profile.profile_picture = file_path
+    db.commit()
+
+    return {"message": "Profile picture uploaded successfully", "path": file_path}
+
+
 
 #  Get User Profile
 @router.get("/profile")
@@ -14,6 +54,22 @@ def get_my_profile(db: Session = Depends(get_db), current_user=Depends(get_curre
     if not profile:
         return {"message": "Profile not found"}
     return profile
+
+@router.get("/profile/{user_id}")
+def get_user_profile_by_id(user_id: int, db: Session = Depends(get_db)):
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found.")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    return {
+        "name": user.name,
+        "profile_picture": profile.profile_picture
+    }
+
 
 # Create Profile
 @router.post("/profile", status_code=status.HTTP_201_CREATED)

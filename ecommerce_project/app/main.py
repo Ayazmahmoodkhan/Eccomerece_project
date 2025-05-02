@@ -3,7 +3,7 @@ from fastapi_mail import FastMail, MessageSchema
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 from app.database import get_db, Base , engine
-from app.models import User
+from app.models import User,ProductVariant
 from app.schemas import UserCreate, UserLogin,ResetPasswordRequest
 from app.utils import hash_password, verify_password , pwd_context, create_reset_token, verify_reset_token
 from app.auth import create_access_token
@@ -11,6 +11,10 @@ from app.send_email import send_email_background
 import os
 from fastapi.responses import RedirectResponse
 from app.routers import profile_address
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.middleware.cors import CORSMiddleware
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 from app.routers.admin import router as admin_router
 from app.routers.categoryroute import router as category_router
 from app.routers.productroute import router as product_router
@@ -19,7 +23,6 @@ from app.routers.webhook import router as webhook_router
 from app.routers.payment import router as payment_router
 from app.routers.orders import router as order_router
 from app.routers.reviews import router as review_router
-from app.routers.user_profile import router as userprofile_router
 from app.routers.shipping_details import router as shippingdetails_router
 from app.rate_limiter import setup_rate_limiting
 from fastapi.staticfiles import StaticFiles
@@ -28,7 +31,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app=FastAPI()
 
-# app.mount("/media", StaticFiles(directory="media"), name="media")
+app.mount("/media", StaticFiles(directory="media"), name="media")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,7 +44,6 @@ app.add_middleware(
 
 setup_rate_limiting(app)
 Base.metadata.create_all(bind=engine)
-
 
 #register & login start
 @app.post("/register/")
@@ -56,7 +59,7 @@ def register(user:UserCreate,background_tasks:BackgroundTasks,db:Session=Depends
         email=user.email,
         hashed_password=hash_password(user.password),
         is_active=True,
-        role=user.role
+        role="user"
     )
     db.add(new_user)
     db.commit()
@@ -127,22 +130,28 @@ async def validate_token(token: str):
     return RedirectResponse(url=frontend_url)
 @app.post("/reset-password/")
 async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
-    """User ka password reset karega"""
     user_id = verify_reset_token(data.token)
     if not user_id:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    if data.new_password != data.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user.password = hash_password(data.new_password)
+
+    user.hashed_password = hash_password(data.new_password)
+    db.add(user)
     db.commit()
+
     return {"message": "Password updated successfully"}
+
 #forgot password reset end
 
 # Routers  
 
 app.include_router(profile_address.router, prefix="/user", tags=["User Profile & Address"])
-app.include_router(userprofile_router)
 app.include_router(admin_router)
 app.include_router(product_router)
 app.include_router(category_router)
