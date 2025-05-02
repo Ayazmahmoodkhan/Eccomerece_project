@@ -39,3 +39,5 @@ stripe==12.0.0
 typing_extensions==4.12.2
 urllib3==2.3.0
 uvicorn==0.29.0
+slowapi==0.1.9
+

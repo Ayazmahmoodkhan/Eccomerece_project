@@ -254,9 +254,7 @@ class OrderItem(Base):
         product = relationship("Product", back_populates="order_items")
         variant = relationship("ProductVariant", back_populates="order_items")
 
-        class Config:
-            orm_mode = True
-
+       
 
 # Review Table
 

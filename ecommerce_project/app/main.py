@@ -18,6 +18,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 from app.routers.admin import router as admin_router
 from app.routers.categoryroute import router as category_router
 from app.routers.productroute import router as product_router
+from app.routers.sorting_product import router as sorting_router
 # from app.routers.cart import router as cart_router
 from app.routers.webhook import router as webhook_router
 from app.routers.payment import router as payment_router
@@ -161,3 +162,4 @@ app.include_router(order_router)
 app.include_router(shippingdetails_router)
 app.include_router(webhook_router)
 app.include_router(payment_router)
+app.include_router(sorting_router)
