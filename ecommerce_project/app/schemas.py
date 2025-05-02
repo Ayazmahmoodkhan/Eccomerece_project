@@ -374,16 +374,33 @@ class ReviewCreate(BaseModel):
     product_id: int
     rating: int 
     description: str
+    email : EmailStr
 
 class ReviewResponse(BaseModel):
     id: int
     product_id: int
     user_id: int
+    email: str
     rating: int
     description: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+# Review Update Schema
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(ge=1, le=5)
+    description: Optional[str] = Field(max_length=500)
+
+    model_config = ConfigDict(from_attributes=True)
+
+# Review Update Schema
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(ge=1, le=5)
+    description: Optional[str] = Field(max_length=500)
+
+    class Config:
+        orm_mode = True
 
 # schema for pyment table
 
