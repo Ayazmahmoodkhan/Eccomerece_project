@@ -21,7 +21,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(ERROR_DIR, exist_ok=True)
 
 # Add Products
-
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def add_product(
     product_name: str = Form(...),
@@ -76,12 +75,14 @@ async def add_product(
                 if field not in variant_data:
                     raise HTTPException(status_code=400, detail=f"'{field}' is required in variant at index {idx}")
 
-            attributes = variant_data.get("attributes", {})
             price = variant_data["price"]
             stock = variant_data["stock"]
             discount = variant_data.get("discount", 0)
             shipping_time = variant_data.get("shipping_time")
             image_count = variant_data.get("image_count", 1)
+        attributes = {} 
+        direct_fields = {"price", "stock", "discount", "shipping_time", "image_count"}
+        attributes = {k: v for k, v in variant_data.items() if k not in direct_fields}
 
         # ----- Field validations -----
         if not isinstance(price, (int, float)) or price < 0:
@@ -110,9 +111,8 @@ async def add_product(
             raise HTTPException(status_code=400, detail=f"Invalid 'image_count' in variant at index {idx}")
 
             # Extract dynamic attributes
-        direct_fields = {"price", "stock", "discount", "shipping_time", "image_count"}
-        attributes = {k: v for k, v in variant_data.items() if k not in direct_fields}
-
+     
+    
         new_variant = ProductVariant(
                 product_id=new_product.id,
                 price=price,
@@ -123,7 +123,7 @@ async def add_product(
             )
         db.add(new_variant)
         db.flush()
-        db.refresh(new_variant)    
+        db.refresh(new_variant)
 
         variant_image_urls = []
         if len(variant_images) < image_count:
@@ -148,11 +148,13 @@ async def add_product(
 
             with open(file_path, "wb") as buffer:
                 buffer.write(await image.read())
+            with open(file_path, "wb") as buffer:
+                buffer.write(await image.read())
 
-                image_url = f"/media/uploads/{filename}"
-                db.add(ProductImage(variant_id=new_variant.id, image_url=image_url))
-                variant_image_urls.append(image_url)
-                image_index += 1
+            image_url = f"/media/uploads/{filename}"
+            db.add(ProductImage(variant_id=new_variant.id, image_url=image_url))
+            variant_image_urls.append(image_url)
+            image_index += 1
 
         # ----- Build variant response -----
         created_variants.append({
@@ -379,7 +381,8 @@ def get_products(db: Session = Depends(get_db)):
     return product_responses
 
 # GET product by ID
-
+from fastapi import Path
+from typing_extensions import Annotated
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: Annotated[int, Path(ge=1)], db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -588,7 +591,7 @@ async def update_product(
         admin_id=product.admin_id,
         created_at=product.created_at,
         updated_at=product.updated_at,
-        variants= variants,
+        variants=created_variants,
         images=[]
     )
 
@@ -650,13 +653,50 @@ def get_products_by_rating(
             func.avg(Review.rating).label("avg_rating")
         )
         .group_by(Review.product_id)
+        .subquery())
+#get unique brand for drop down
+@router.get("/brands/",response_model=List[str])
+def get_brands(db:Session=Depends(get_db)):
+    brands=db.query(Product.brand).distinct().all()
+    return [b[0] for b in brands]
+#filter products by brands
+@router.get("/filter/",response_model=List[ProductResponse])
+def get_products_by_brand(brand:str=None,db:Session=Depends(get_db)):
+    query=db.query(Product)
+    if brand:
+        query=query.filter(Product.brand==brand)
+    return query.all()
+
+from sqlalchemy import case, func, desc
+
+@router.get("/search/", response_model=List[ProductResponse])
+def search_products_by_name(
+    query: str,
+    min_rating: float = Query(0, ge=0, le=5),  # Default to 0, range from 0 to 5
+    db: Session = Depends(get_db)
+):
+    # Match priority: exact match (3), startswith (2), contains (1)
+    subquery = (
+        db.query(
+            Review.product_id,
+            func.avg(Review.rating).label("avg_rating")
+        )
+        .group_by(Review.product_id)
         .subquery()
+    )
+
+    match_score = case(
+        (Product.product_name.ilike(query), 3),
+        (Product.product_name.ilike(f"{query}%"), 2),
+        (Product.product_name.ilike(f"%{query}%"), 1),
+        else_=0
     )
 
     products = (
         db.query(Product)
         .join(subquery, Product.id == subquery.c.product_id)
-        .filter(subquery.c.avg_rating >= min_rating)
+        .filter(subquery.c.avg_rating >= min_rating)  # Filter by the min_rating
+        .order_by(match_score.desc())  # Sort by match score
         .all()
     )
 
@@ -689,13 +729,10 @@ def get_products_by_rating(
             created_at=product.created_at,
             updated_at=product.updated_at,
             variants=variant_list,
-            images=[]
+            images=[]  # Can be populated with other images if needed
         ))
 
     return product_responses
-
- 
-
 # Delete products by ID
 
 # @router.delete("/delete/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
