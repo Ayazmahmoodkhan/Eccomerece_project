@@ -99,7 +99,6 @@ class ProductVariantCreate(ProductVariantBase):
 class ProductVariantResponse(ProductVariantBase):
     id: int
     images: List[str]
-    attributes: Optional[Dict[str, str]] = {}
 
     @field_validator("images", mode="before")
     @classmethod
@@ -393,6 +392,14 @@ class ReviewUpdate(BaseModel):
     description: Optional[str] = Field(max_length=500)
 
     model_config = ConfigDict(from_attributes=True)
+
+# Review Update Schema
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(ge=1, le=5)
+    description: Optional[str] = Field(max_length=500)
+
+    class Config:
+        orm_mode = True
 
 # Review Update Schema
 class ReviewUpdate(BaseModel):
