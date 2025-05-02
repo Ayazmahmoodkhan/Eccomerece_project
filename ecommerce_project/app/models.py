@@ -266,6 +266,7 @@ class Review(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     rating = Column(Integer)
     description = Column(String)
+    email = Column(String)
     created_at = Column(DateTime, default=func.now())
 
     # Relationships

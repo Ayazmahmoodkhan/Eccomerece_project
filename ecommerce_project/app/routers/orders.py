@@ -34,7 +34,6 @@ def create_order(
         item_total = discounted_price * item.quantity
         total_amount += item_total
 
-        # Track max shipping time
         if variant.shipping_time and variant.shipping_time > max_shipping_days:
             max_shipping_days = variant.shipping_time
 
@@ -75,7 +74,7 @@ def create_order(
         coupon_id=order_data.coupon_id,
         discount_amount=round(coupon_discount_amount, 2),
         final_amount=round(final_amount, 2),
-        user_id=current_user.id  # taken from token
+        user_id=current_user.id  
   
     )
     db.add(new_order)
@@ -96,18 +95,18 @@ def create_order(
         db.add(order_item)
 
     db.commit()
-    # ---- Return Final Order (you can customize the response if needed) ----
     return db.query(models.Order)\
              .options(selectinload(models.Order.order_items))\
              .filter(models.Order.id == new_order.id).first()
 
 #Get all Orders with Items
-@router.get("/",response_model=list[schemas.OrderResponse])
-def get_all_orders(db:Session=Depends(get_db),current_user:models.User=Depends(get_current_user)):
+@router.get("/", response_model=List[schemas.OrderResponse])
+def get_all_orders(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if current_user.role == "admin":
-        return db.query(models.Order).options(selectinload(models.Orders.items)).all()
+        return db.query(models.Order).options(selectinload(models.Order.order_items)).all()
     else:
-        return db.query(models.Order).filter(models.Order.user_id==current_user.id).options(selectinload(models.Order.order_items)).all()
+        return db.query(models.Order).filter(models.Order.user_id == current_user.id).options(selectinload(models.Order.order_items)).all()
+    
 # Get single Order by ID with Items
 @router.get("/{order_id}", response_model=schemas.OrderResponse)
 def get_order(order_id: int, db: Session = Depends(get_db),current_user:models.User=Depends(get_current_user)):
@@ -116,9 +115,7 @@ def get_order(order_id: int, db: Session = Depends(get_db),current_user:models.U
 
     if not order:
         raise HTTPException(status_code=404, detail=f"Order with ID {order_id} not found")
-    # ab check karo
     if current_user.role != "admin":
-        # agar admin nahi hai to check karo ke yeh order is user ka hai ya nahi
         if order.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="You are not authorized to view this order")
     

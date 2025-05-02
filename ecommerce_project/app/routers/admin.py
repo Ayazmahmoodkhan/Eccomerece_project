@@ -5,8 +5,8 @@ from app.auth import get_current_user
 from app.utils import pwd_context
 from typing import List
 from app.database import get_db
-from app.models import User, Product, Order, Category, Refund
-from app.schemas import ProductCreate, OrderUpdate, CategoryResponse, RefundResponse
+from app.models import User, Product, Order, Category, Refund, Review
+from app.schemas import ProductCreate, OrderUpdate, CategoryResponse, RefundResponse, ReviewResponse, ReviewUpdate
 router=APIRouter()
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -67,7 +67,7 @@ def get_categories(db: Session = Depends(get_db)):
 def get_orders(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
     orders = db.query(Order).all()
     return {"orders": orders}
-
+# Get single Order by ID with Items
 @router.put("/orders/{order_id}")
 def update_order_status(order_id: int, order_update: OrderUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
@@ -88,6 +88,29 @@ def get_all_refunds(
     refunds = db.query(Refund).all()
     return refunds
 
+# Updete reviews by admin
+
+@router.put("/reviews/{review_id}", response_model=ReviewResponse)
+def update_review(review_id: int, review_data: ReviewUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    review.content = review_data.content
+    review.rating = review_data.rating
+    db.commit()
+    db.refresh(review)
+    return {"msg": "Review updated successfully", "review": review}
+
+# Delete reviews by admin
+@router.delete("/reviews/{review_id}")
+def delete_review(review_id: int, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review: 
+        raise HTTPException(status_code=404, detail="Review not found")
+    db.delete(review)   
+    db.commit()  
+    return {"msg": "Review deleted successfully"}
 # # User Management
 # @router.get("/users")
 # def get_users(admin: User = Depends(admin_required), db: Session = Depends(get_db)):

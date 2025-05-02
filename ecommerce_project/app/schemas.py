@@ -99,15 +99,9 @@ class ProductVariantCreate(ProductVariantBase):
 class ProductVariantResponse(ProductVariantBase):
     id: int
     images: List[str]
-    attributes: Optional[Dict[str, str]] = {}
 
-    @field_validator("images", mode="before")
-    @classmethod
-    def extract_image_paths(cls, value):
-        if isinstance(value, list) and all(hasattr(i, "image_url") for i in value):
-            return [i.image_url for i in value]
-        return value
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # Product
 
@@ -134,7 +128,8 @@ class ProductResponse(ProductBase):
     updated_at: Optional[datetime]
     variants: List[ProductVariantResponse] = []
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 # Cart Item Schema
@@ -374,16 +369,34 @@ class ReviewCreate(BaseModel):
     product_id: int
     rating: int 
     description: str
+    email : EmailStr
 
 class ReviewResponse(BaseModel):
     id: int
     product_id: int
     user_id: int
+    email: str
     rating: int
     description: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+# Review Update Schema
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(ge=1, le=5)
+    description: Optional[str] = Field(max_length=500)
+
+    class Config:
+        orm_mode = True
+
+# Review Update Schema
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(ge=1, le=5)
+    description: Optional[str] = Field(max_length=500)
+
+    class Config:
+        orm_mode = True
 
 # schema for pyment table
 
