@@ -1,5 +1,6 @@
+from sqlalchemy.orm import selectinload
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, joinedload
 from typing import List
 from datetime import datetime, timedelta
 from app import models, schemas
@@ -13,18 +14,27 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 #  Create Order 
 
 @router.post("/", response_model=schemas.OrderResponse, status_code=status.HTTP_201_CREATED)
-def create_order(
+def create_order_with_shipping(
     order_data: schemas.OrderCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    if not order_data.shipping_details:
+        raise HTTPException(status_code=400, detail="Shipping details are required.")
 
     total_amount = 0
     item_details = []
     max_shipping_days = 0
 
     for item in order_data.order_items:
-        variant = db.query(models.ProductVariant).filter(models.ProductVariant.id == item.variant_id).first()
+        variant = db.query(models.ProductVariant)\
+            .options(
+                selectinload(models.ProductVariant.product),
+                selectinload(models.ProductVariant.images)
+            )\
+            .filter(models.ProductVariant.id == item.variant_id)\
+            .first()
+
         if not variant:
             raise HTTPException(status_code=404, detail=f"Variant ID {item.variant_id} not found")
 
@@ -37,75 +47,139 @@ def create_order(
         if variant.shipping_time and variant.shipping_time > max_shipping_days:
             max_shipping_days = variant.shipping_time
 
+        # Safely get product image
+        product_image = variant.images[0].image_url if variant.images else None
+
+        item.product_name = variant.product.product_name
+        item.variant_attributes = variant.attributes
+        item.variant_image = product_image
+
         item_details.append({
-            "product_id": item.product_id,
+            "product_id": variant.product.id,
             "variant_id": item.variant_id,
             "mrp": price,
             "quantity": item.quantity,
-            "total_price": round(item_total, 2)
+            "total_price": round(item_total, 2),
+            "product_name": item.product_name,
+            "variant_attributes": item.variant_attributes,
+            "variant_image": item.variant_image
         })
 
-    # ---- Apply coupon if exists ----
+    # Coupon logic
     coupon_discount_amount = 0
-    coupon_obj = None
     if order_data.coupon_id:
-        coupon_obj = db.query(models.Coupon).filter(models.Coupon.id == order_data.coupon_id, models.Coupon.is_active == True).first()
-        if not coupon_obj:
+        coupon = db.query(models.Coupon).filter(
+            models.Coupon.id == order_data.coupon_id,
+            models.Coupon.is_active == True
+        ).first()
+        if not coupon:
             raise HTTPException(status_code=400, detail="Invalid or expired coupon")
 
-        if coupon_obj.discount_type == "percentage":
-            coupon_discount_amount = total_amount * (coupon_obj.discount_value / 100)
-        elif coupon_obj.discount_type == "fixed":
-            coupon_discount_amount = coupon_obj.discount_value
+        if coupon.discount_type == "percentage":
+            coupon_discount_amount = total_amount * (coupon.discount_value / 100)
+        elif coupon.discount_type == "fixed":
+            coupon_discount_amount = coupon.discount_value
 
-    final_amount = total_amount - coupon_discount_amount
-    if final_amount < 0:
-        final_amount = 0
+    final_amount = max(total_amount - coupon_discount_amount, 0)
 
     order_date = datetime.utcnow()
     shipping_date = order_date + timedelta(days=max_shipping_days)
 
-    # ---- Create Order ----
+    # Create Order
     new_order = models.Order(
         order_date=order_date,
         order_amount=round(total_amount, 2),
         shipping_date=shipping_date,
-        order_status=order_data.order_status,
+        order_status=order_data.order_status or "pending",
         coupon_id=order_data.coupon_id,
         discount_amount=round(coupon_discount_amount, 2),
         final_amount=round(final_amount, 2),
-        user_id=current_user.id  
-  
+        user_id=current_user.id
     )
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
 
-
-    # ---- Create Order Items ----
+    # Create Order Items
     for item in item_details:
-        order_item = models.OrderItem(
+        db.add(models.OrderItem(
             order_id=new_order.id,
             product_id=item["product_id"],
             variant_id=item["variant_id"],
             mrp=item["mrp"],
             quantity=item["quantity"],
             total_price=item["total_price"]
-        )
-        db.add(order_item)
+        ))
+
+    # Create Shipping Details
+    shipping_data = order_data.shipping_details.model_dump()
+    shipping_data.pop("shipping_date", None)
+    db.add(models.ShippingDetails(
+        **shipping_data,
+        user_id=current_user.id,
+        order_id=new_order.id,
+        shipping_date=shipping_date
+    ))
 
     db.commit()
-    return db.query(models.Order)\
-             .options(selectinload(models.Order.order_items))\
-             .filter(models.Order.id == new_order.id).first()
+
+    # Final fetch with details
+    created_order = db.query(models.Order)\
+        .options(
+            selectinload(models.Order.order_items)
+            .selectinload(models.OrderItem.variant)
+            .selectinload(models.ProductVariant.product),
+            selectinload(models.Order.order_items)
+            .selectinload(models.OrderItem.variant)
+            .selectinload(models.ProductVariant.images),
+            selectinload(models.Order.shipping_details)
+        )\
+        .filter(models.Order.id == new_order.id).first()
+
+    # Attach values to order_items before returning
+    for item in created_order.order_items:
+        variant = item.variant
+        if variant:
+            item.product_name = variant.product.product_name
+            item.variant_attributes = variant.attributes
+            item.variant_image = variant.images[0].image_url if variant.images else None
+
+    return created_order
+
+
+
 
 #Get all Orders with Items
+
+
 @router.get("/", response_model=List[schemas.OrderResponse])
 def get_all_orders(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role == "admin":
-        return db.query(models.Order).options(selectinload(models.Order.order_items)).all()
-    else:
-        return db.query(models.Order).filter(models.Order.user_id == current_user.id).options(selectinload(models.Order.order_items)).all()
+    query = db.query(models.Order).options(
+        selectinload(models.Order.order_items)
+            .selectinload(models.OrderItem.variant)
+            .selectinload(models.ProductVariant.product),
+        selectinload(models.Order.order_items)
+            .selectinload(models.OrderItem.variant)
+            .selectinload(models.ProductVariant.images),
+        joinedload(models.Order.shipping_details) 
+    )
+
+    if current_user.role != "admin":
+        query = query.filter(models.Order.user_id == current_user.id)
+
+    orders = query.all()
+
+    for order in orders:
+        for item in order.order_items:
+            variant = item.variant
+            if variant:
+                item.product_name = variant.product.product_name
+                item.variant_attributes = variant.attributes
+                item.variant_image = variant.images[0].image_url if variant.images else None
+
+    return orders
+
+
     
 # Get single Order by ID with Items
 @router.get("/{order_id}", response_model=schemas.OrderResponse)
@@ -125,7 +199,7 @@ def get_order(order_id: int, db: Session = Depends(get_db),current_user:models.U
 @router.put("/cancel/{order_id}")
 def cancel_order(order_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
-      # Authorization check
+    
     if not current_user.role=="admin" and order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You are not allowed to cancel this order")
     
@@ -213,10 +287,10 @@ def apply_coupon(order_id: int, request: schemas.ApplyCouponRequest, db: Session
         discount_amount = coupon.discount_value
 
 
-    discount_amount = min(discount_amount, order.order_amount)  # discount zyada na ho order se
+    discount_amount = min(discount_amount, order.order_amount)  
 
     # Update Order
-    order.coupon_id = coupon.id  # Link by ID
+    order.coupon_id = coupon.id  
     order.discount_amount = discount_amount
     order.final_amount = order.order_amount - discount_amount
 
@@ -234,10 +308,13 @@ def apply_coupon(order_id: int, request: schemas.ApplyCouponRequest, db: Session
 
 #  Delete Order 
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_order(order_id: int, db: Session = Depends(get_db)):
+def delete_order(order_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    if not current_user.role == "admin" and order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You are not authorized to delete this order")
 
     db.query(models.OrderItem).filter(models.OrderItem.order_id == order_id).delete(synchronize_session=False)
     db.delete(order)

@@ -5,6 +5,24 @@ from enum import Enum
 from typing import Optional, List, Any, Literal,Dict
 from app.models import RatingEnum
 
+# website logo schema
+class WebsiteLogoBase(BaseModel):   
+    name: str
+    logo_path: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+class WebsiteLogoCreate(WebsiteLogoBase):
+    pass
+class WebsiteLogoUpdate(WebsiteLogoBase):
+    name: Optional[str] = None
+    logo_path: Optional[str] = None
+class WebsiteLogoResponse(WebsiteLogoBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    model_config = ConfigDict(from_attributes=True)
+
+# User Schemas
 class UserCreate(BaseModel):
     name: str = Field(..., min_length=3, max_length=50)
     username: str = Field(..., min_length=3, max_length=25)
@@ -35,6 +53,7 @@ class Addressbase(BaseModel):
     city:str
     state:str
     postal_code:str
+    country:str
 class AddressCreate(Addressbase):
     pass
 class AddressUpdate(Addressbase):
@@ -85,17 +104,23 @@ class CategoryResponse(CategoryBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+
 from decimal import Decimal
 from typing_extensions import Annotated
+
+
+# ---------------- Variant Schemas ----------------
+
 class ProductVariantBase(BaseModel):
-    price: Annotated[Decimal, Field(gt=0)]  
-    stock: Annotated[int, Field(ge=0)] 
-    discount: Optional[Annotated[int, Field(ge=0, le=100)]] = 0  
-    shipping_time: Optional[Annotated[int, Field(ge=0)]] = None  
+    price: Annotated[Decimal, Field(gt=0)]
+    stock: Annotated[int, Field(ge=0)]
+    discount: Optional[Annotated[int, Field(ge=0, le=100)]] = 0
+    shipping_time: Optional[Annotated[int, Field(ge=0)]] = None
     attributes: Dict[str, str]
 
 class ProductVariantCreate(ProductVariantBase):
-    images: List[str]  
+    images: List[str]
+
 class ProductVariantResponse(ProductVariantBase):
     id: int
     images: List[str]
@@ -106,10 +131,11 @@ class ProductVariantResponse(ProductVariantBase):
         if isinstance(value, list) and all(hasattr(i, "image_url") for i in value):
             return [i.image_url for i in value]
         return value
+
     model_config = ConfigDict(from_attributes=True)
 
-# Product
 
+# ---------------- Product Schemas ----------------
 
 class ProductBase(BaseModel):
     product_name: str
@@ -132,6 +158,15 @@ class ProductResponse(ProductBase):
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     variants: List[ProductVariantResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------- Image Response ----------------
+
+class ProductImageResponse(BaseModel):
+    id: int
+    image_url: str
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -168,11 +203,6 @@ class ProductResponse(ProductBase):
 #     grand_total: float  
 #     created_at: datetime
 #     cart_items: List[CartItemResponse]
-class ProductImageResponse(BaseModel):
-    id: int
-    image_url: str
-
-    model_config = ConfigDict(from_attributes=True) 
 
 
 
@@ -266,7 +296,61 @@ class OrderStatus(str, Enum):
 #     class Config:
 #         orm_mode = True
 
-#new schemas
+# shipping details schema 
+
+#  Base schema (no order_id here)
+class ShippingDetailsBase(BaseModel):
+    full_name: str
+    email: EmailStr
+    contact_information: str
+    additional_note: Optional[str] = None
+    address: str
+    state: str
+    city: str                     
+    country: str
+    postal_code: int             
+    shipping_date: Optional[datetime] = None
+
+#  Create schema (inherits base, no order_id)
+class ShippingDetailsCreate(ShippingDetailsBase):
+    pass
+
+#  Update schema 
+class ShippingDetailsUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    contact_information: Optional[str] = None
+    additional_note: Optional[str] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    postal_code: Optional[int] = None
+    shipping_date: Optional[datetime] = None
+
+# Shipping Response schema 
+class ShippingDetailsResponse(BaseModel):
+    id: int
+    order_id: int
+    user_id: int
+    full_name: str
+    email: EmailStr
+    contact_information: str
+    additional_note: Optional[str] = None
+    address: str
+    state: str
+    city: str
+    country: str
+    postal_code: int
+    shipping_date: Optional[datetime] = None
+    created_timestamp: Optional[datetime] = None
+    updated_timestamp: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+
+
 # -------- Order Status Enum --------
 class OrderStatus(str, Enum):
     pending = "pending"
@@ -277,11 +361,9 @@ class OrderStatus(str, Enum):
 
 # -------- OrderItem Schemas --------
 class OrderItemBase(BaseModel):
-
     product_id: int
     variant_id: int
     quantity: int
-
 
 class OrderItemCreate(OrderItemBase):
     pass
@@ -291,13 +373,13 @@ class OrderItemResponse(BaseModel):
     product_id: int
     variant_id: int
     quantity: int
-    mrp: float
     total_price: float
-
-    # product: Optional[ProductResponse]
-    # variant: Optional[ProductVariantResponse]
+    product_name: Optional[str] = None
+    variant_attributes: Optional[Dict[str, Any]] = None
+    variant_image: Optional[str] = None  # First image of the variant
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # -------- Order Schemas --------
 class OrderBase(BaseModel):
@@ -308,12 +390,13 @@ class OrderBase(BaseModel):
 
 class OrderCreate(OrderBase):
     order_items: List[OrderItemCreate]
+    shipping_details: ShippingDetailsCreate
 
 class OrderResponse(OrderBase):
     id: int
     user_id: int
     user: Optional[UserResponse]
-    order_date: datetime 
+    order_date: datetime
     order_amount: float
     shipping_charge: float
     discount_amount: float
@@ -322,9 +405,10 @@ class OrderResponse(OrderBase):
     created_timestamp: datetime
     updated_timestamp: datetime
     order_items: List[OrderItemResponse]
-    # shipping_date:int
+    shipping_details: Optional[ShippingDetailsResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class OrderUpdate(BaseModel):
     order_status: Optional[OrderStatus] = None
@@ -346,7 +430,7 @@ class OrderCancelResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-
+# -------- Coupon Schemas --------
 class CouponBase(BaseModel):
     code: str
     discount_type: Literal["percentage", "fixed"]
@@ -365,6 +449,7 @@ class CouponResponse(CouponBase):
 
 class ApplyCouponRequest(BaseModel):
     coupon_code: str
+
 #end new schemas
 
 
@@ -462,54 +547,29 @@ class PaymentLogResponse(PaymentLogCreate):
     class Config:
         orm_mode = True
 
-# Refund Payments Schema
-
-
-class RefundResponse(BaseModel):
-    id: int
+# Stripe Checkout Session Response
+class StripeCheckoutResponse(BaseModel):
+    payment_id: int
     order_id: int
-    stripe_refund_id: str
+    checkout_url: str
     amount: float
-    reason: str | None = None
     status: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
-
-
-# shipping details schema 
-
-class ShippingDetailsBase(BaseModel):
-    order_id : int
-    contact_information: str
-    additional_note: Optional[str] = None
-    address: str
-    state:  str
-    country: str
-    shipping_date : Optional [str] = None
-
-class ShippingDetailsCreate(ShippingDetailsBase):
-    pass
-
-# shipping details update 
-
-class ShippingDetailsUpdate(BaseModel):
-    contact_information: Optional[str] = None
-    additional_note: Optional[str] = None
-    address: Optional[str] = None
-    state: Optional[str] = None
-    country: Optional[str] = None
-    shipping_date: Optional[datetime] = None
-
-# shipping details response
-
-class ShippingDetailsResponse(ShippingDetailsBase):
-    id : int
-    created_timestamp: datetime
-    updated_timestamp: Optional[datetime]
+# refund response
+class RefundResponse(BaseModel):
+    id: int
+    payment_id: int
+    amount: float
+    status: str
+    reason: Optional[str] = None
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
 
 
 

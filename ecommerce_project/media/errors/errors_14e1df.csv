@@ -1,0 +1,3 @@
+product_name,brand,is_feature,category_id,description,price,stock,discount,attribute,image_filenames, ,error
+t-Shirt,Nike,False,1,good in look,99.9,23,40,"{""color"":""red"",""Size"":""M"",""Gender"":""Male""}","nike1.jpg, nike2.jpg",,Missing required field 'attributes'
+Shoes,Nike,False,2,good in look,99.9,22,40,"{""color"":""red"",""Size"":""M"",""Gender"":""Male""}"," ""nike5.jpg"," nike6.png""",Missing required field 'attributes'

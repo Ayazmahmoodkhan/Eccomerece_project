@@ -1,20 +1,23 @@
-import stripe
+import stripe, os
 from fastapi import APIRouter, Request, Header, HTTPException, status, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.config import settings
 from app.database import get_db
-from app.models import Payment, Order, User
+from app.models import Payment, Order, User, OrderStatus
 from app.send_email import send_payment_confirmation
-
+from dotenv import load_dotenv
 router = APIRouter(prefix="/webhook", tags=["Stripe Webhook"])
 
 # Set your secret key
 stripe.api_key = settings.stripe_secret_key
+load_dotenv()
+stripe_webhook_secret= os.getenv("STRIPE_WEBHOOK_SECRET")
 
 
-@router.post("/stripe")
+
+@router.post("/")
 async def stripe_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -27,7 +30,7 @@ async def stripe_webhook(
         event = stripe.Webhook.construct_event(
             payload=payload,
             sig_header=stripe_signature,
-            secret=settings.stripe_webhook_secret
+            secret=stripe_webhook_secret
         )
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature")
@@ -47,7 +50,9 @@ async def stripe_webhook(
             # Fetch related order and user
             order = db.query(Order).filter(Order.id == payment.order_id).first()
             user = db.query(User).filter(User.id == order.user_id).first() if order else None
-
+            if order:
+                order.order_status=OrderStatus.shipped
+            db.commit()
             # Send payment confirmation email
             if user:
                 send_payment_confirmation(

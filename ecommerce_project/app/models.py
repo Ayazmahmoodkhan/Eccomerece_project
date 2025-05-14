@@ -30,6 +30,15 @@ class RatingEnum(int, enum.Enum):
     four_star = 4
     five_star = 5
 
+# website logo table
+class WebsiteLogo(Base):
+    __tablename__ = "website_logo"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    logo_path = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 # User Table
 class User(Base):
     __tablename__ = "users"
@@ -72,6 +81,7 @@ class Address(Base):
     city = Column(String, nullable=False)
     state = Column(String, nullable=False)
     postal_code = Column(String, nullable=False)
+    country = Column(String, nullable=False)
 
     user = relationship("User", back_populates="addresses")
 
@@ -247,7 +257,7 @@ class OrderItem(Base):
 
         mrp = Column(Float, nullable=False)
         quantity = Column(Integer, nullable=False)
-        total_price = Column(Float, nullable=False)  # Optional but useful
+        total_price = Column(Float, nullable=False)  
 
         # Relationships
         order = relationship("Order", back_populates="order_items")
@@ -330,7 +340,12 @@ class ShippingDetails(Base):
         ForeignKey(column="orders.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
     )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    full_name = Column(String, nullable=False)
     contact_information = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    postal_code = Column(Integer, nullable=False)
+    city = Column(String, nullable=False)
     additional_note = Column(String, nullable=True)
     address = Column(String, nullable=False)
     state = Column(String, nullable=False)
@@ -339,7 +354,7 @@ class ShippingDetails(Base):
     created_timestamp = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
     updated_timestamp = Column(TIMESTAMP(timezone=True), nullable=True)
 
-    order = relationship("Order", back_populates="shipping_details")
+    order = relationship("Order", back_populates="shipping_details", uselist=False)
 
 # Coupons table
 class Coupon(Base):

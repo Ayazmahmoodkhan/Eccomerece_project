@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.schemas import  UserCreate
 from app.auth import get_current_user
 from app.utils import pwd_context
-from typing import List
+from typing import List, Optional
 from app.database import get_db
-from app.models import User, Product, Order, Category, Refund, Review
+from app.models import User, Product, Order, Category, Refund, Review, UserProfile, ShippingDetails
 from app.schemas import ProductCreate, OrderUpdate, CategoryResponse, RefundResponse, ReviewResponse, ReviewUpdate
-router=APIRouter()
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
 @router.post("/create-admin")
@@ -88,19 +88,6 @@ def get_all_refunds(
     refunds = db.query(Refund).all()
     return refunds
 
-# Updete reviews by admin
-
-@router.put("/reviews/{review_id}", response_model=ReviewResponse)
-def update_review(review_id: int, review_data: ReviewUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    review = db.query(Review).filter(Review.id == review_id).first()
-    if not review:
-        raise HTTPException(status_code=404, detail="Review not found")
-
-    review.content = review_data.content
-    review.rating = review_data.rating
-    db.commit()
-    db.refresh(review)
-    return {"msg": "Review updated successfully", "review": review}
 
 # Delete reviews by admin
 @router.delete("/reviews/{review_id}")
@@ -128,22 +115,7 @@ def delete_review(review_id: int, admin: User = Depends(admin_required), db: Ses
 #     db.refresh(user)
 #     return {"msg": "User status updated", "user": user}
 
-# # Payments & Refunds
-# @router.get("/payments")
-# def get_payments(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-#     payments = db.query(Payment).all()
-#     return {"payments": payments}
 
-# @router.put("/payments/{payment_id}/refund")
-# def refund_payment(payment_id: int, refund_data: PaymentRefund, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-#     payment = db.query(Payment).filter(Payment.id == payment_id).first()
-#     if not payment:
-#         raise HTTPException(status_code=404, detail="Payment not found")
-
-#     payment.refunded = refund_data.refunded
-#     db.commit()
-#     db.refresh(payment)
-#     return {"msg": "Payment refunded successfully", "payment": payment}
 
 #Reports & Analytics
 @router.get("/reports")
@@ -157,3 +129,59 @@ def get_reports(admin: User = Depends(admin_required), db: Session = Depends(get
         "total_orders": total_orders,
         "total_users": total_users
     }
+
+
+# Check how many sales were made in the last 30 days
+@router.get("/sales-last-30-days")
+def get_sales_last_30_days(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+    thirty_days_ago = datetime.now(datetime.timezone.utc) - timedelta(days=30)
+    sales = db.query(Order).filter(Order.order_date >= thirty_days_ago).count()
+    return {"sales_last_30_days": sales}
+
+# Check Prchaseed Products in the last 30 days
+
+@router.get("/purchased-products-last-30-days")
+def get_purchased_products_last_30_days(
+    state: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None, ge=1),
+    offset: int = Query(0, ge=0),
+    admin: User = Depends(admin_required),
+    db: Session = Depends(get_db)
+):
+    if admin.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can access this endpoint.")
+
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    query = db.query(
+        Order.id.label("order_id"),
+        Order.order_date,
+        UserProfile.first_name,
+        UserProfile.last_name,
+        UserProfile.profile_picture
+    ).join(UserProfile, Order.user_id == UserProfile.id
+    ).join(ShippingDetails, ShippingDetails.order_id == Order.id
+    ).filter(
+        Order.order_date >= thirty_days_ago,
+    )
+
+    if state:
+        query = query.filter(ShippingDetails.state.ilike(f"%{state}%"))
+
+    if limit:
+        query = query.offset(offset).limit(limit)
+
+    orders = query.all()
+
+    result = [
+        {
+            "order_id": order.order_id,
+            "order_date": order.order_date,
+            "user_full_name": f"{order.first_name} {order.last_name}",
+            "user_profile_pic": order.profile_picture
+        }
+        for order in orders
+    ]
+
+    return {"purchased_products_last_30_days": result}
