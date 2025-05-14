@@ -12,16 +12,17 @@ class UserRole(str, enum.Enum):
     user = "user"
 
 class OrderStatus(str, enum.Enum):
-    pending = "pending"
-    shipped = "shipped"
-    delivered = "delivered"
-    cancelled = "cancelled"
+    pending = "Pending"
+    confirmed = "Confirmed"
+    shipped = "Shipped"
+    delivered = "Delivered"
+    cancelled = "Cancelled"
 
 class PaymentMode(str, enum.Enum):
-    credit_card = "Credit Card"
-    debit_card = "Debit Card"
-    paypal = "PayPal"
-    cash_on_delivery = "Cash on Delivery"
+    credit_card = "credit_card"
+    debit_card = "debit_card"
+    paypal = "paypal"
+    cash_on_delivery = "cash_on_delivery"
 
 class RatingEnum(int, enum.Enum):
     one_star = 1
@@ -303,7 +304,9 @@ class Payment(Base):
 
     id = Column(Integer, primary_key=True, nullable=False)
     order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, unique=True)
-    stripe_payment_intent_id = Column(String, nullable=False, unique=True)
+    stripe_payment_intent_id = Column(String, nullable=True, unique=True)
+    stripe_checkout_session_id = Column(String) 
+    paypal_payment_intent_id = Column(String, nullable=True, unique=True)
     stripe_customer_id = Column(String, nullable=True)
     payment_method = Column(String, nullable=False)
     currency = Column(String, default="usd")
@@ -369,7 +372,10 @@ class Coupon(Base):
     orders = relationship("Order", back_populates="coupon")
 
 # Refunds Table
-
+class RefundStatus(str, enum.Enum):
+    requested = "requested"
+    approved = "approved"
+    rejected = "rejected"
 class Refund(Base):
     __tablename__ = "refunds"
 
@@ -378,7 +384,14 @@ class Refund(Base):
     stripe_refund_id = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
     reason = Column(Text, nullable=True)
-    status = Column(String, nullable=False)
+    status = Column(Enum(RefundStatus), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     order = relationship("Order", back_populates="refunds")
+
+class PaymentMethod(Base):
+    __tablename__ = "payment_methods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    method = Column(Enum(PaymentMode), unique=True, nullable=False)
+    enabled = Column(Boolean, default=True)

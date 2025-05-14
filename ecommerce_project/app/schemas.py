@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator,condecimal, conint, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, field_validator,condecimal, conint, ConfigDict, validator
 
 from datetime import date,datetime
 from enum import Enum
@@ -42,6 +42,8 @@ class UserResponse(BaseModel):
     role: str
 
     model_config=ConfigDict(from_attributes=True)
+class UserUpdate(BaseModel):
+    is_active: bool
 
 class ResetPasswordRequest(BaseModel):
     token: str
@@ -354,6 +356,7 @@ class ShippingDetailsResponse(BaseModel):
 # -------- Order Status Enum --------
 class OrderStatus(str, Enum):
     pending = "pending"
+    confirmed = "confirmed"
     shipped = "shipped"
     delivered = "delivered"
     cancelled = "cancelled"
@@ -506,6 +509,8 @@ class PaymentMode(str, Enum):
 class PaymentBase(BaseModel):
     order_id: int
     stripe_payment_intent_id: Optional[str] = None
+    paypal_payment_intent_id: Optional[str] = None
+    stripe_checkout_session_id:Optional[str]=None
     stripe_customer_id: Optional[str] = None
     payment_method: PaymentMode
     currency: Optional[str] = "usd"
@@ -519,11 +524,9 @@ class PaymentCreate(PaymentBase):
     pass
 
 class PaymentIntentRequest(BaseModel):
-    amount: float
-    currency: str = "usd"
-    payment_method: PaymentMode 
-    metadata: Optional[dict] = None
     order_id: int
+    currency: str = "usd"
+    payment_method: PaymentMode
 
 class PaymentResponse(PaymentBase):
     id: int
@@ -531,7 +534,12 @@ class PaymentResponse(PaymentBase):
     updated_timestamp: Optional[datetime]
 
     model_config = ConfigDict(from_attributes=True)
-
+class StripeCheckoutResponse(BaseModel):
+    payment_id: int
+    order_id: int
+    checkout_url: str
+    amount: float
+    status: str
 # schema for payments logs
 
 class PaymentLogCreate(BaseModel):
@@ -547,9 +555,14 @@ class PaymentLogResponse(PaymentLogCreate):
     class Config:
         orm_mode = True
 
-# Stripe Checkout Session Response
-class StripeCheckoutResponse(BaseModel):
-    payment_id: int
+# Refund Payments Schema
+
+class RefundRequest(BaseModel):
+    order_id: int
+    reason: Optional[str] = None
+
+class RefundResponse(BaseModel):
+    id: int
     order_id: int
     checkout_url: str
     amount: float
@@ -572,4 +585,6 @@ class RefundResponse(BaseModel):
 
 
 
-
+class OrderStatusResponse(BaseModel):
+    order_id: int
+    status: str

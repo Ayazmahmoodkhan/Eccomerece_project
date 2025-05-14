@@ -1,20 +1,22 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Payment, PaymentLog, Order, User, OrderStatus
+from app.models import Payment, PaymentLog, Order, User, OrderStatus, Order, User, OrderStatus
 from app.schemas import PaymentCreate, PaymentResponse, PaymentLogCreate, PaymentIntentRequest, PaymentMode, StripeCheckoutResponse
 from app.config import Settings
-from app.auth import get_current_user
-import stripe
+from app.auth import get_current_user, StripeCheckoutResponse
 import paypalrestsdk
+from app.auth import get_current_user
+from app.routers.admin import PaymentMethod
+import stripe, paypalrestsdk
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
-settings = Settings()
+
 # Configure PayPal SDK
 paypalrestsdk.configure({
     "mode": "sandbox",  # Set to "live" for production
     "client_id": settings.paypal_client_id,  
-    "client_secret": settings.paypal_secret_key  
+    "client_secret": settings.paypal_client_secret
 })
 # Configure Stripe SDK
 stripe.api_key = settings.stripe_secret_key
@@ -42,7 +44,13 @@ async def create_checkout_session(
         if order.order_status != OrderStatus.pending:
             raise HTTPException(status_code=400, detail=f"Your order status is '{order.order_status.value}'")
 
+        # 3. Use order.amount from DB
         amount = order.final_amount
+        # Check if selected payment method is enabled
+        enabled_method = db.query(PaymentMethod).filter_by(method=payment_data.payment_method, enabled=True).first()
+        if not enabled_method:
+            raise HTTPException(status_code=403, detail=f"{payment_data.payment_method} is currently disabled by admin")
+
 
         # ===== Stripe Payment Handling =====
         if payment_data.payment_method in [PaymentMode.credit_card, PaymentMode.debit_card]:
@@ -62,12 +70,13 @@ async def create_checkout_session(
                 cancel_url=f"{settings.frontend_url}/cancel",
                 metadata={"order_id": payment_data.order_id},
             )
-
             # Save payment record for Stripe
             payment = Payment(
                 order_id=order.id,
-                stripe_payment_intent_id=checkout_session.id,
+                stripe_payment_intent_id=checkout_session.payment_intent,
+                stripe_checkout_session_id=checkout_session.id,
                 stripe_customer_id=None,
+                paypal_payment_intent_id=None,
                 payment_method=payment_data.payment_method.value,
                 currency=payment_data.currency,
                 amount=amount,
@@ -98,7 +107,7 @@ async def create_checkout_session(
 
         # ===== PayPal Payment Handling =====
         elif payment_data.payment_method == PaymentMode.paypal:
-            
+            # Create PayPal Payment for PayPal method
             payment_response = paypalrestsdk.Payment({
                 "intent": "sale",
                 "payer": {
@@ -138,10 +147,14 @@ async def create_checkout_session(
                 # Save PayPal payment record
                 payment = Payment(
                     order_id=order.id,
+                    stripe_payment_intent_id=None,          
+                    stripe_customer_id=None,                
+                    paypal_payment_intent_id=payment_response.id, 
                     payment_method="paypal",
                     currency=payment_data.currency,
                     amount=amount,
-                    status="created"
+                    status="created",
+                    payment_ref=None
                 )
 
                 db.add(payment)

@@ -8,6 +8,7 @@ from app.database import get_db
 from app.auth import get_current_user
 from app.routers.admin import admin_required
 from typing import Optional, List, Union
+from typing import Optional, List, Union
 from uuid import uuid4
 import os, uuid, json, csv
 
@@ -538,7 +539,6 @@ async def update_product(
     product.category_id = category_id
     product.is_feature = is_feature
     db.commit()
-    db.refresh(product)
 
     image_index = 0
     link_index = 0

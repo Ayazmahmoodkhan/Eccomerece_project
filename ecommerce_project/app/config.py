@@ -1,8 +1,6 @@
 from pydantic_settings import BaseSettings
-from typing import Optional 
-
+from typing import Optional
 class Settings(BaseSettings):
-    # Your existing fields
     mail_username: str
     mail_password: str
     mail_from: str
@@ -21,7 +19,6 @@ class Config:
         env_file = ".env"
         extra = "allow"  # This allows extra fields like stripe_secret_key and stripe_webhook_secret
 
-# Instantiate the settings
 settings = Settings()
 
 
