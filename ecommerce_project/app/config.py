@@ -1,4 +1,3 @@
-import os
 from pydantic_settings import BaseSettings
 from typing import Optional
 class Settings(BaseSettings):
@@ -11,13 +10,14 @@ class Settings(BaseSettings):
     mail_starttls: bool
     mail_ssl_tls: bool
     stripe_secret_key: str
-    stripe_webhook_secret: str
+    paypal_secret_key: Optional[str] = None 
     paypal_client_id: str
-    paypal_client_secret:Optional[str]=None
+    frontend_url: str
+    stripe_webhook_secret: str  
 
-    class Config:
+class Config:
         env_file = ".env"
-        extra="allow"
+        extra = "allow"  # This allows extra fields like stripe_secret_key and stripe_webhook_secret
 
 settings = Settings()
 

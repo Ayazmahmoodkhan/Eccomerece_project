@@ -13,6 +13,9 @@ from fastapi.responses import RedirectResponse
 from app.routers import profile_address
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
+from app.rate_limiter import setup_rate_limiting
+from fastapi.staticfiles import StaticFiles
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 from app.routers.admin import router as admin_router
@@ -26,9 +29,7 @@ from app.routers.orders import router as order_router
 from app.routers.reviews import router as review_router
 from app.routers.shipping_details import router as shippingdetails_router
 from app.routers.refund import router as refund
-from app.rate_limiter import setup_rate_limiting
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+from app.routers.website_logo import router as website_logo_router
 
 
 app=FastAPI()
@@ -88,7 +89,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN, detail="Your account is inactive"
         )
     
-    access_token = create_access_token(db_user.id)
+    access_token = create_access_token(db_user.id,role=db_user.role)
 
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -155,6 +156,7 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
 
 app.include_router(profile_address.router, prefix="/user", tags=["User Profile & Address"])
 app.include_router(admin_router)
+app.include_router(website_logo_router)
 app.include_router(product_router)
 app.include_router(sorting_router)
 app.include_router(category_router)
@@ -162,6 +164,6 @@ app.include_router(review_router)
 # app.include_router(cart_router)
 app.include_router(order_router)
 app.include_router(shippingdetails_router)
-app.include_router(webhook_router)
 app.include_router(payment_router)
+app.include_router(webhook_router)
 app.include_router(refund)

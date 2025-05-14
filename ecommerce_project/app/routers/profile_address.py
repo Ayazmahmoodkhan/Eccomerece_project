@@ -103,7 +103,7 @@ def get_my_address(db: Session = Depends(get_db), current_user=Depends(get_curre
         return {"message": "Address not found"}
     return address
 
-# Add Address (Max 2 Allowed)
+# Add Address 
 @router.post("/address", status_code=status.HTTP_201_CREATED)
 def add_address(address_data: AddressCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     existing_addresses = db.query(Address).filter(Address.user_id == current_user.id).count()

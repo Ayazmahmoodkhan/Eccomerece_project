@@ -111,3 +111,29 @@ def get_reviews_by_product(
         raise HTTPException(status_code=404, detail="No reviews found for this product")
     
     return reviews
+
+# Updete reviews by user
+
+@router.put("/{review_id}", response_model=schemas.ReviewResponse)
+def update_review(
+    review_id: int,
+    review_data: schemas.ReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    review = db.query(models.Review).filter(
+        models.Review.id == review_id,
+        models.Review.user_id == current_user.id
+    ).first()
+
+    if not review:
+        raise HTTPException(
+            status_code=404,
+            detail="Review not found or not yours"
+        )
+
+    review.rating = review_data.rating
+    review.description = review_data.description
+    db.commit()
+    db.refresh(review)
+    return review

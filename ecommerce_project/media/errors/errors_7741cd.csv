@@ -1,0 +1,2 @@
+product_name,brand,is_feature,category_id,description,price,stock,discount,attributes,image_filenames,error
+Shoes,Nike,False,1,good in look,99.9,23,40,"{""color"":""red"",""size"":""M"",""gender"":""Male""}","nike1.jpg,nike2.jpg",Image file 'nike1.jpg' not found in upload

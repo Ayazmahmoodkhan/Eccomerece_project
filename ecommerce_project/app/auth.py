@@ -12,11 +12,12 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRES_MINUTES = 180
 
 
-def create_access_token(user_id: int):
+def create_access_token(user_id: int, role: str):
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRES_MINUTES)
     payload = {
         "user_id": user_id,
         "exp": expire, 
+        "role": role,
         "sub": str(user_id) 
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
@@ -27,6 +28,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int = payload.get("user_id")
+        role: str = payload.get("role")
+        if role not in ["admin", "user"]:
+            raise HTTPException(status_code=403, detail="Access forbidden: Invalid role")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token structure")
         user = db.query(User).filter(User.id == user_id).first()
