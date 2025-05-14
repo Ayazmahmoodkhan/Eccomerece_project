@@ -25,6 +25,7 @@ from app.routers.payment import router as payment_router
 from app.routers.orders import router as order_router
 from app.routers.reviews import router as review_router
 from app.routers.shipping_details import router as shippingdetails_router
+from app.routers.refund import router as refund
 from app.rate_limiter import setup_rate_limiting
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -155,6 +156,7 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
 app.include_router(profile_address.router, prefix="/user", tags=["User Profile & Address"])
 app.include_router(admin_router)
 app.include_router(product_router)
+app.include_router(sorting_router)
 app.include_router(category_router)
 app.include_router(review_router)
 # app.include_router(cart_router)
@@ -162,4 +164,4 @@ app.include_router(order_router)
 app.include_router(shippingdetails_router)
 app.include_router(webhook_router)
 app.include_router(payment_router)
-app.include_router(sorting_router)
+app.include_router(refund)

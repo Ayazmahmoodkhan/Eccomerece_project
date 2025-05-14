@@ -7,7 +7,7 @@ from app.schemas import  ProductCreate,ProductResponse, ProductVariantResponse, 
 from app.database import get_db
 from app.auth import get_current_user
 from app.routers.admin import admin_required
-from typing import Optional, List
+from typing import Optional, List, Union
 from uuid import uuid4
 import os, uuid, json, csv
 
@@ -479,36 +479,36 @@ def delete_product(product_id: int, db: Session = Depends(get_db), admin: dict =
 
 
 #update the product
-@router.put("/products/{product_id}", response_model=ProductResponse)
+@router.put("/{product_id}", response_model=ProductResponse)
 async def update_product(
     product_id: int,
     product_name: Optional[str] = Form(None),
     brand: Optional[str] = Form(None),
     category_id: Optional[int] = Form(None),
     description: Optional[str] = Form(None),
-    variants: Optional[List[str]] = Form(None),
-    variant_images: Optional[List[UploadFile]] = File(None),
+    variants: List[str] = Form(...),  # List of JSON strings
+    variant_images: Optional[Union[UploadFile, List[UploadFile]]] = File(None),
     admin: dict = Depends(admin_required),
     db: Session = Depends(get_db)
 ):
-    # Check if product exists
+    # Step 1: Check if product exists
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Update basic product fields if provided
+    # Step 2: Validate and update product fields
     if product_name:
-        if not isinstance(product_name, str) or len(product_name.strip()) == 0:
+        if not isinstance(product_name, str) or not product_name.strip():
             raise HTTPException(status_code=400, detail="Invalid product name")
         product.product_name = product_name.strip('"')
 
     if brand:
-        if not isinstance(brand, str) or len(brand.strip()) == 0:
+        if not isinstance(brand, str) or not brand.strip():
             raise HTTPException(status_code=400, detail="Invalid brand")
         product.brand = brand.strip('"')
 
     if description:
-        if not isinstance(description, str) or len(description.strip()) == 0:
+        if not isinstance(description, str) or not description.strip():
             raise HTTPException(status_code=400, detail="Invalid description")
         product.description = description.strip('"')
 
@@ -518,48 +518,59 @@ async def update_product(
             raise HTTPException(status_code=400, detail="Category not found")
         product.category_id = category_id
 
-    db.commit()
-    db.refresh(product)
+    # Step 3: Parse and validate all variant data first
+    parsed_variants = []
+    for idx, variant_str in enumerate(variants):
+        try:
+            variant_dict = json.loads(variant_str)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail=f"Variant {idx} has invalid JSON.")
 
+        try:
+            validated = ProductVariantCreate(**variant_dict)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error in variant {idx}: {e}")
+
+        parsed_variants.append((validated, variant_dict))
+
+    # Step 4: Remove old variants and their images
+    old_variant_ids = db.query(ProductVariant.id).filter_by(product_id=product.id).subquery()
+    db.query(ProductImage).filter(ProductImage.variant_id.in_(old_variant_ids)).delete(synchronize_session=False)
+    db.query(ProductVariant).filter_by(product_id=product.id).delete(synchronize_session=False)
+
+    db.commit()
+
+    # Step 5: Add new variants and their images
     created_variants = []
     image_index = 0
 
-    if variants:
-        # Remove old variants and images
-        db.query(ProductImage).filter(ProductImage.variant_id.in_(
-            db.query(ProductVariant.id).filter_by(product_id=product_id)
-        )).delete(synchronize_session=False)
+    for variant_obj, variant_dict in parsed_variants:
+        attributes = {
+            k: v for k, v in variant_dict.items() if k not in {"price", "stock", "discount", "shipping_time", "images"}
+        }
 
-        db.query(ProductVariant).filter_by(product_id=product_id).delete()
+        new_variant = ProductVariant(
+            product_id=product.id,
+            price=variant_obj.price,
+            stock=variant_obj.stock,
+            discount=variant_obj.discount,
+            shipping_time=variant_obj.shipping_time,
+            attributes=attributes
+        )
+        db.add(new_variant)
+        db.commit()
+        db.refresh(new_variant)
 
-        for idx, variant_str in enumerate(variants):
-            try:
-                variant_data = json.loads(variant_str)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail=f"Variant at index {idx} has invalid JSON format.")
+        image_urls = []
 
-            # Validate variant data using ProductVariantCreate model
-            try:
-                variant = ProductVariantCreate(**variant_data)
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=f"Invalid data for variant at index {idx}: {e}")
-
-            attributes = {k: v for k, v in variant_data.items() if k not in {"price", "stock", "discount", "shipping_time", "image_count"}}
-            new_variant = ProductVariant(
-                product_id=product.id,
-                price=variant.price,
-                stock=variant.stock,
-                discount=variant.discount,
-                shipping_time=variant.shipping_time,
-                attributes=attributes
-            )
-            db.add(new_variant)
-            db.commit()
-            db.refresh(new_variant)
-
-            image_count = variant.image_count
-            image_urls = []
-            for _ in range(image_count):
+        # Add images (replace existing paths or upload new ones)
+        for image_input in variant_obj.images:
+            if image_input.startswith("/static/uploads/"):
+                # It's an existing image path
+                db.add(ProductImage(variant_id=new_variant.id, image_url=image_input))
+                image_urls.append(image_input)
+            else:
+                # It's a new upload – get from uploaded list
                 if variant_images and image_index < len(variant_images):
                     image = variant_images[image_index]
                     filename = f"{uuid.uuid4()}_{image.filename}"
@@ -571,15 +582,19 @@ async def update_product(
                     image_urls.append(image_url)
                     image_index += 1
 
-            created_variants.append({
-                "id": new_variant.id,
-                "price": new_variant.price,
-                "stock": new_variant.stock,
-                "discount": new_variant.discount,
-                "shipping_time": new_variant.shipping_time,
-                "attributes": new_variant.attributes,
-                "images": image_urls
-            })
+        created_variants.append({
+            "id": new_variant.id,
+            "price": new_variant.price,
+            "stock": new_variant.stock,
+            "discount": new_variant.discount,
+            "shipping_time": new_variant.shipping_time,
+            "attributes": new_variant.attributes,
+            "images": image_urls
+        })
+
+    # Final product commit
+    db.commit()
+    db.refresh(product)
 
     return ProductResponse(
         id=product.id,
@@ -591,8 +606,7 @@ async def update_product(
         admin_id=product.admin_id,
         created_at=product.created_at,
         updated_at=product.updated_at,
-        variants=created_variants,
-        images=[]
+        variants=created_variants
     )
 
 #get product by category

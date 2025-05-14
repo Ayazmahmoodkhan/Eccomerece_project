@@ -5,8 +5,8 @@ from app.auth import get_current_user
 from app.utils import pwd_context
 from typing import List
 from app.database import get_db
-from app.models import User, Product, Order, Category, Refund, Review
-from app.schemas import ProductCreate, OrderUpdate, CategoryResponse, RefundResponse, ReviewResponse, ReviewUpdate
+from app.models import User, Product, Order, Category, Refund, Review, PaymentMethod, PaymentMode
+from app.schemas import ProductCreate, OrderUpdate, CategoryResponse, RefundResponse, ReviewResponse, ReviewUpdate, UserUpdate
 router=APIRouter()
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -111,40 +111,26 @@ def delete_review(review_id: int, admin: User = Depends(admin_required), db: Ses
     db.delete(review)   
     db.commit()  
     return {"msg": "Review deleted successfully"}
-# # User Management
-# @router.get("/users")
-# def get_users(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-#     users = db.query(User).filter(User.role == "user").all()
-#     return {"users": users}
+# User Management
+@router.get("/users")
+def get_users(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    users = db.query(User).filter(User.role == "user").all()
+    return {"users": users}
 
-# @router.put("/users/{user_id}")
-# def block_unblock_user(user_id: int, user_update: UserUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-#     user = db.query(User).filter(User.id == user_id).first()
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
-
-#     user.is_active = user_update.is_active
-#     db.commit()
-#     db.refresh(user)
-#     return {"msg": "User status updated", "user": user}
-
-# # Payments & Refunds
-# @router.get("/payments")
-# def get_payments(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-#     payments = db.query(Payment).all()
-#     return {"payments": payments}
-
-# @router.put("/payments/{payment_id}/refund")
-# def refund_payment(payment_id: int, refund_data: PaymentRefund, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-#     payment = db.query(Payment).filter(Payment.id == payment_id).first()
-#     if not payment:
-#         raise HTTPException(status_code=404, detail="Payment not found")
-
-#     payment.refunded = refund_data.refunded
-#     db.commit()
-#     db.refresh(payment)
-#     return {"msg": "Payment refunded successfully", "payment": payment}
-
+@router.put("/user/{user_id}")
+def block_unblock_user(user_id:int,user_update:UserUpdate,admin:User=Depends(admin_required),db:Session=Depends(get_db)):
+    user=db.query(User).filter(User.id==user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_active==user_update.is_active:
+        return {
+            "msg": f"User is already {'active' if user.is_active else 'inactive'}",
+            "user": {"id": user.id, "is_active": user.is_active}
+        }
+    user.is_active=user_update.is_active
+    db.commit()
+    db.refresh(user)
+    return {"msg":"user status update successfully", "user": {"id":user.id,"is_active":user.is_active}}
 #Reports & Analytics
 @router.get("/reports")
 def get_reports(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
@@ -157,3 +143,35 @@ def get_reports(admin: User = Depends(admin_required), db: Session = Depends(get
         "total_orders": total_orders,
         "total_users": total_users
     }
+
+def seed_payment_methods(db: Session):
+    for method in PaymentMode:
+        exists = db.query(PaymentMethod).filter_by(method=method).first()
+        if not exists:
+            db.add(PaymentMethod(method=method, enabled=True))
+    db.commit()
+@router.post("/seed-payment-methods")
+def seed_payment_endpoint(
+    db: Session = Depends(get_db),
+    admin: User = Depends(admin_required)
+):
+    seed_payment_methods(db)
+    return {"message": "Payment methods seeded successfully"}
+@router.get("/payment-methods/enabled", response_model=List[str])
+def get_enabled_payment_methods(db: Session = Depends(get_db)):
+    enabled_methods = db.query(PaymentMethod).filter_by(enabled=True).all()
+    return [m.method.value for m in enabled_methods]
+@router.put("/{method}/toggle")
+def toggle_payment_method(
+    method: PaymentMode,
+    enable: bool,
+    db: Session = Depends(get_db),
+    admin: User = Depends(admin_required)  # Only admin!
+):
+    payment_method = db.query(PaymentMethod).filter_by(method=method).first()
+    if not payment_method:
+        raise HTTPException(status_code=404, detail="Payment method not found")
+    payment_method.enabled = enable
+    db.commit()
+    return {"message": f"{method.value} {'enabled' if enable else 'disabled'}"}
+

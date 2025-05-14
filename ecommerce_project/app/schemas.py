@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator,condecimal, conint, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, field_validator,condecimal, conint, ConfigDict, validator
 
 from datetime import date,datetime
 from enum import Enum
@@ -24,6 +24,8 @@ class UserResponse(BaseModel):
     role: str
 
     model_config=ConfigDict(from_attributes=True)
+class UserUpdate(BaseModel):
+    is_active: bool
 
 class ResetPasswordRequest(BaseModel):
     token: str
@@ -92,7 +94,7 @@ class ProductVariantBase(BaseModel):
     stock: Annotated[int, Field(ge=0)] 
     discount: Optional[Annotated[int, Field(ge=0, le=100)]] = 0  
     shipping_time: Optional[Annotated[int, Field(ge=0)]] = None  
-    attributes: Dict[str, str]
+    attributes: Dict
 
 class ProductVariantCreate(ProductVariantBase):
     images: List[str]  
@@ -270,6 +272,7 @@ class OrderStatus(str, Enum):
 # -------- Order Status Enum --------
 class OrderStatus(str, Enum):
     pending = "pending"
+    confirmed = "confirmed"
     shipped = "shipped"
     delivered = "delivered"
     cancelled = "cancelled"
@@ -323,6 +326,11 @@ class OrderResponse(OrderBase):
     updated_timestamp: datetime
     order_items: List[OrderItemResponse]
     # shipping_date:int
+    @validator("order_status", pre=True)
+    def lowercase_status(cls, v):
+        if isinstance(v, str):
+            return v.lower()
+        return v
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -421,6 +429,8 @@ class PaymentMode(str, Enum):
 class PaymentBase(BaseModel):
     order_id: int
     stripe_payment_intent_id: Optional[str] = None
+    paypal_payment_intent_id: Optional[str] = None
+    stripe_checkout_session_id:Optional[str]=None
     stripe_customer_id: Optional[str] = None
     payment_method: PaymentMode
     currency: Optional[str] = "usd"
@@ -434,11 +444,9 @@ class PaymentCreate(PaymentBase):
     pass
 
 class PaymentIntentRequest(BaseModel):
-    amount: float
-    currency: str = "usd"
-    payment_method: PaymentMode 
-    metadata: Optional[dict] = None
     order_id: int
+    currency: str = "usd"
+    payment_method: PaymentMode
 
 class PaymentResponse(PaymentBase):
     id: int
@@ -446,7 +454,12 @@ class PaymentResponse(PaymentBase):
     updated_timestamp: Optional[datetime]
 
     model_config = ConfigDict(from_attributes=True)
-
+class StripeCheckoutResponse(BaseModel):
+    payment_id: int
+    order_id: int
+    checkout_url: str
+    amount: float
+    status: str
 # schema for payments logs
 
 class PaymentLogCreate(BaseModel):
@@ -464,6 +477,9 @@ class PaymentLogResponse(PaymentLogCreate):
 
 # Refund Payments Schema
 
+class RefundRequest(BaseModel):
+    order_id: int
+    reason: Optional[str] = None
 
 class RefundResponse(BaseModel):
     id: int
@@ -513,3 +529,6 @@ class ShippingDetailsResponse(ShippingDetailsBase):
 
 
 
+class OrderStatusResponse(BaseModel):
+    order_id: int
+    status: str

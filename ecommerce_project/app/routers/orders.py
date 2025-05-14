@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, selectinload
 from typing import List
 from datetime import datetime, timedelta
 from app import models, schemas
+from app.models import Order, User, OrderStatus
 from app.database import get_db
 from app.auth import get_current_user
 import stripe
@@ -181,7 +182,7 @@ def get_refunds(order_id: int, db: Session = Depends(get_db), current_user: mode
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if not current_user.is_admin and order.user_id != current_user.id:
+    if current_user.role !="admin"  and order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You are not allowed to view refunds for this order")
 
     return refunds
@@ -243,3 +244,29 @@ def delete_order(order_id: int, db: Session = Depends(get_db)):
     db.delete(order)
     db.commit()
     return {"detail": "Order and associated items deleted successfully"}
+
+@router.put("/{order_id}/status")
+def update_order_status(
+    order_id: int,
+    status: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_user)
+):
+    if not admin.role == "admin":
+        raise HTTPException(status_code=403, detail="Only admins can update order status")
+    # Convert string to enum safely
+    try:
+        status_enum = OrderStatus(status.capitalize())
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid order status. Must be one of: Pending, Confirmed, Shipped, Delivered, Cancelled"
+        )
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.order_status == status_enum:
+        raise HTTPException(status_code=400, detail="Order status is already set to this value")
+    order.order_status = status_enum
+    db.commit()
+    return {"message": f"Order {order_id} status updated to {status_enum.value}"}

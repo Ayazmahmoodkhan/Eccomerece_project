@@ -32,6 +32,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         user = db.query(User).filter(User.id == user_id).first()
         if user is None:
             raise HTTPException(status_code=401, detail="Invalid user")
+        if not user.is_active:
+            raise HTTPException(
+                status_code=403,
+                detail="Inactive user. Access denied.",
+            )
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
